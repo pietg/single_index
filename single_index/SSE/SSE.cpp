@@ -70,7 +70,7 @@ List Compute_SSE()
     seed=159;
     
     n=1000;
-    NumIt=1000;
+    NumIt=500;
     m=3;
     
     Rcout << "Number of observations:" << std::setw(10) << n << std::endl << std::endl;
