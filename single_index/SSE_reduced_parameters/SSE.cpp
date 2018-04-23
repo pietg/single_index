@@ -56,7 +56,7 @@ Rcpp::List Compute_SSE()
 {
     int             i,j,m,iter,iter2,NumIt,seed, nIterations;
     double          rho;
-    double          **covar,*mean,**estimate,*alpha0,*alpha,*beta,*beta0,*beta_init;
+    double          **covar,*mean,**estimate,*alpha0,*alpha,*beta,*beta0;
     double          eps;
     clock_t         StartTime, StopTime;
     double          Time_simulation;
@@ -102,7 +102,7 @@ Rcpp::List Compute_SSE()
     alpha = new double[m];
     beta0= new double[m-1];
     beta = new double[m-1];
-    beta_init = new double[m-1];
+
 
     f= new double[m-1];
     psi  = new double[n];
@@ -196,7 +196,7 @@ Rcpp::List Compute_SSE()
     
     // free memory
     
-    delete[] mean, delete[] yy, delete[] vv, delete[] alpha0, delete[] alpha,
+    delete[] mean, delete[] yy, delete[] vv, delete[] alpha0, delete[] alpha, delete[] beta0, delete[] beta,
      delete[] f, delete[] psi, delete[] cumw, delete[] cs;
     
     for (i = 0;i < n;i++) delete[] xx[i];
