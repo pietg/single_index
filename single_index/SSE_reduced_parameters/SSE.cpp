@@ -21,7 +21,7 @@
 #include <Rcpp.h>
 
 using namespace std;
-//using namespace Rcpp;
+using namespace Rcpp;
 
 int n;
 double **xx,*yy,*vv,*cumw,*cs,*f,*psi;
@@ -52,7 +52,7 @@ void    statistics(int n, int m, double **estimate, double *mean, double **covar
 
 // [[Rcpp::export]]
 
-Rcpp::List Compute_SSE()
+List Compute_SSE()
 {
     int             i,j,m,iter,iter2,NumIt,seed, nIterations;
     double          rho;
@@ -61,11 +61,11 @@ Rcpp::List Compute_SSE()
     clock_t         StartTime, StopTime;
     double          Time_simulation;
     
-    Rcpp::Rcout << std::endl << std::endl;
-    Rcpp::Rcout << "Piet Groeneboom 2018" << std::endl << "For more information see:" << std::endl;
-    Rcpp::Rcout << "Score estimation in the monotone single index model" << std::endl;
-    Rcpp::Rcout << "Fadoua Balabdaoui, Piet Groeneboom and Kim Hendrickx" << std::endl;
-    Rcpp::Rcout << "https://arxiv.org/abs/1712.05593" << std::endl << std::endl;
+    Rcout << std::endl << std::endl;
+    Rcout << "Piet Groeneboom 2018" << std::endl << "For more information see:" << std::endl;
+    Rcout << "Score estimation in the monotone single index model" << std::endl;
+    Rcout << "Fadoua Balabdaoui, Piet Groeneboom and Kim Hendrickx" << std::endl;
+    Rcout << "https://arxiv.org/abs/1712.05593" << std::endl << std::endl;
     
     seed=59;
     
@@ -75,8 +75,8 @@ Rcpp::List Compute_SSE()
     
     rho=0.5;
     
-    Rcpp::Rcout << "Number of observations:" << std::setw(10) << n << std::endl << std::endl;
-    Rcpp::Rcout << "Number of samples:" << std::setw(10) << NumIt << std::endl << std::endl;
+    Rcout << "Number of observations:" << std::setw(10) << n << std::endl << std::endl;
+    Rcout << "Number of samples:" << std::setw(10) << NumIt << std::endl << std::endl;
     
     nIterations=1000;
     eps=1.0e-10;
@@ -119,14 +119,14 @@ Rcpp::List Compute_SSE()
     StartTime = clock();
 
     
-    Rcpp::Rcout << "     Iteration  " << "  alpha1  " << "      alpha2  "<< "       alpha3  " << std::endl << std::endl;
+    Rcout << "     Iteration  " << "  alpha1  " << "      alpha2  "<< "       alpha3  " << std::endl << std::endl;
 
     
     for (iter=0;iter<NumIt;iter++)
     {
         gen_data(m,n,alpha0,xx,yy,vv,seed+iter);
         
-        iter2=hooke(2,beta0,beta,rho,eps,nIterations,&criterion);
+        iter2=hooke(m-1,beta0,beta,rho,eps,nIterations,&criterion);
         
         alpha[0]=cos(beta[0])*sin(beta[1]);
         alpha[1]=sin(beta[0])*sin(beta[1]);
@@ -135,7 +135,7 @@ Rcpp::List Compute_SSE()
         for (j=0;j<m;j++)
             estimate[iter][j]=alpha[j];
 
-        Rcpp::Rcout  << setw(10) << iter+1 << setprecision(6) <<  setw(15) << alpha[0] << setprecision(6) <<  setw(15) << alpha[1] << setprecision(6) <<  setw(15) << alpha[2] << std::endl;
+        Rcout  << setw(10) << iter+1 << setprecision(6) <<  setw(15) << alpha[0] << setprecision(6) <<  setw(15) << alpha[1] << setprecision(6) <<  setw(15) << alpha[2] << std::endl;
 
        
     }
@@ -143,12 +143,12 @@ Rcpp::List Compute_SSE()
     StopTime  = clock();
     Time_simulation   = (double)(StopTime - StartTime)/(double)CLOCKS_PER_SEC;
     
-    Rcpp::Rcout << std::endl << std::endl;
-    Rcpp::Rcout << "The computations took    " << setprecision(10) << Time_simulation << "   seconds"  << std::endl;
+    Rcout << std::endl << std::endl;
+    Rcout << "The computations took    " << setprecision(10) << Time_simulation << "   seconds"  << std::endl;
     
     statistics(NumIt,m,estimate,mean,covar);
 
-    Rcpp::NumericMatrix out1 = Rcpp::NumericMatrix(NumIt,m);
+    NumericMatrix out1 = NumericMatrix(NumIt,m);
     
     for (i=0;i<NumIt;i++)
     {
@@ -156,13 +156,13 @@ Rcpp::List Compute_SSE()
             out1(i,j) = estimate[i][j];
     }
 
-    Rcpp::NumericVector out2 = Rcpp::NumericVector(m);
+    NumericVector out2 = NumericVector(m);
     
     for (i=0;i<m;i++)
         out2(i)=mean[i];
     
     
-    Rcpp::NumericMatrix out3 = Rcpp::NumericMatrix(m,m);
+    NumericMatrix out3 = NumericMatrix(m,m);
     
     for (i=0;i<m;i++)
     {
@@ -185,14 +185,14 @@ Rcpp::List Compute_SSE()
     }
     
 
-    Rcpp::Rcout << "Making output Rcpp::List" << std::endl;
+    Rcout << "Making output List" << std::endl;
     
-    // make the Rcpp::List for the output
+    // make the List for the output
     
-    Rcpp::List out = Rcpp::List::create(Rcpp::Named("SSE")=out1,Rcpp::Named("means")=out2,Rcpp::Named("covariance_matrix")=out3);
+    List out = List::create(Named("SSE")=out1,Named("means")=out2,Named("covariance_matrix")=out3);
     
     
-    Rcpp::Rcout << "Freeing memory" << std::endl;
+    Rcout << "Freeing memory" << std::endl;
     
     // free memory
     
