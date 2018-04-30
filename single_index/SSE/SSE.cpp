@@ -57,7 +57,7 @@ List Compute_SSE()
     int             i,j,m,iter,iter2,NumIt,seed, nIterations;
     double          *alpha,*alpha0,rho;
     double          **covar,*mean,**estimate, *alpha_init;
-    double          eps;
+    double          eps,sum;
     clock_t         StartTime, StopTime;
     double          Time_simulation;
     
@@ -69,8 +69,8 @@ List Compute_SSE()
     
     seed=159;
     
-    n=1000;
-    NumIt=500;
+    n=500;
+    NumIt=1000;
     m=3;
     
     Rcout << "Number of observations:" << std::setw(10) << n << std::endl << std::endl;
@@ -123,12 +123,16 @@ List Compute_SSE()
         for (i=0;i<m;i++)
             alpha_init[i]=1/sqrt(m);
         
-        rho=0.9;
+        rho=0.5;
         
         iter2=hooke(m,alpha_init,alpha,rho,eps,nIterations,&criterion);
         
+        sum=0;
+        for (i=0;i<m;i++)
+            sum += SQR(alpha[i]);
+        
         for (j=0;j<m;j++)
-            estimate[iter][j]=alpha[j];
+            estimate[iter][j]=alpha[j]/sqrt(sum);
         
                 
         Rcout  << setw(10) << iter+1 << setprecision(6) <<  setw(15) << alpha[0] << setprecision(6) <<  setw(15) << alpha[1] << setprecision(6) <<  setw(15) << alpha[2] << std::endl;
@@ -212,12 +216,13 @@ void gen_data(int m, int n, double alpha[], double **xx, double yy[], double vv[
     
     
     std::mt19937 generator(seed);
+    std::uniform_real_distribution<> dis(0,1);
     std::normal_distribution<double> dis_normal(0.0,1.0);
     
     for (i=0;i<n;i++)
     {
         for (j=0;j<m;j++)
-            xx[i][j] = dis_normal(generator);
+            xx[i][j] = 1+dis(generator);
         
         yy[i]=0;
         
@@ -295,16 +300,6 @@ double criterion(int m, double alpha[])
 {
     int i,j;
     double lambda, sum;
-    
-    sum=0;
-    for (i=0;i<m;i++)
-        sum += SQR(alpha[i]);
-    
-    sum = sqrt(sum);
-    
-    for (i=0;i<m;i++)
-        alpha[i] /= sum;
-    
     
     sort_alpha(m,n,xx,alpha,vv,yy);
     

@@ -6,6 +6,7 @@ library(Rcpp)#
 	C <- output$covariance_matrix#
 	B#
 	C
+A
 library(Rcpp)#
 	sourceCpp("SSE.cpp")#
   output <- Compute_SSE()#
@@ -14,4 +15,3 @@ library(Rcpp)#
 	C <- output$covariance_matrix#
 	B#
 	C
-A
