@@ -13,7 +13,7 @@ sample sizes, but is not superior to the other algorithms. In fact, an example i
 BoxPlot_alpha_err_and_time_table1_n=5000.pdf, where the non-efficient simple score
 estimator SSE gives a better performance, both in computing time and values.
 At the end of the runs of simulation_table1.R and simulation_table2.R the estimate of psi
-and its derivative psi' is shown. I one experiments with other sample sizes and dimensions
+and its derivative psi' is shown. If one experiments with other sample sizes and dimensions
 (by changing parameters at the beginning of the files simulation_table1.R and
 simulation_table2.R) the bandwidth for estimating psi' has to be adapted in ESE.cpp.
 
