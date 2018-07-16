@@ -19,5 +19,6 @@ simulation_table2.R) the bandwidth for estimating psi' has to be adapted in ESE.
 
 The computation of SSE and LSE is started from alpha=(1,0,...,0) (rather far from the
 actual value (alpha=1/sqrt{m})(1,...,1)), the other algorithms except EDR are started from
-the estimate given by SSE, and EDR does not need a starting value.
+the estimate given by SSE, and EDR does not need a starting value. The minimization
+algorithm pf Nelder-Mead is used instead of the Hooke-Jeeves method, used before.
 Comments should be directed to Piet Groeneboom.
