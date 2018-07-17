@@ -21,4 +21,5 @@ The computation of SSE and LSE is started from alpha=(1,0,...,0) (rather far fro
 actual value (alpha=1/sqrt{m})(1,...,1)), the other algorithms except EDR are started from
 the estimate given by SSE, and EDR does not need a starting value. The minimization
 algorithm of Nelder-Mead is used instead of the Hooke-Jeeves method, used before.
-Comments should be directed to Piet Groeneboom.
+For running the scripts, one needs to be able to run the package Rcpp. One also needs to
+copy the other files of the directory, since most of them are used in the scripts.
