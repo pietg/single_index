@@ -150,7 +150,7 @@ List ComputeESE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
     
      List out = List::create(Rcpp::Named("data")=out0,Rcpp::Named("alpha")=out1,Rcpp::Named("psi")=out2,Rcpp::Named("derivative")=out3,Rcpp::Named("niter")=out4);
     
-    // The last element shows the number of iterations in th Nelder-Mead algorithm
+    // The last element shows the number of iterations in the Nelder-Mead algorithm
     
     // free memory
    
@@ -167,11 +167,13 @@ List ComputeESE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
 
 double criterion(double alpha[])
 {
-    int i,j,m2;
-    double h1,h,u,lambda,sum,*uu,*pp,t1,t2,t3,A,B;
+    int i,j,m1;
+    double h1,h,u,lambda,sum,*uu,*pp,A,B;
     
     uu= new double[n];
     pp= new double[n];
+    
+    sum=0;
     
     for (i=0;i<m;i++)
     {
@@ -179,15 +181,11 @@ double criterion(double alpha[])
             alpha[i]=-alpha[i];
     }
     
-    sum=0;
-    
     for (i=0;i<m;i++)
         sum += SQR(alpha[i]);
     
-    sum = sqrt(sum);
-    
     for (i=0;i<m;i++)
-        alpha[i] /= sum;
+        alpha[i]/=sqrt(sum);
     
     sort_alpha(m,n,xx,alpha,vv,yy);
     
@@ -219,21 +217,56 @@ double criterion(double alpha[])
         }
     }
     
-    m2=j;
+    m1=j;
     
     for (i=0;i<n;i++)
     {
-        sum=0;
         u=vv[i];
-        for (j=0;j<m2;j++)
+        
+        if (u<=B && u>=A)
         {
-            t1=(u-uu[j])/h1;
-            t2=(u+uu[j]-2*A)/h1;
-            t3=(2*B-u-uu[j])/h1;
-            sum += (KK(t1)+KK(t2)-KK(t3))*pp[j];
-            //sum+= KK(t1)*pp[j];
+            sum=0;
+            for (j=0;j<=m1;j++)
+            {
+                if (uu[j]<= u-h1)
+                    sum += pp[j];
+                
+                if (u-h1<uu[j] && uu[j]<u+h1)
+                    sum += KK((u-uu[j])/h1)*pp[j];
+            }
+            psi_smooth[i]=psi[0]+sum;
         }
-        psi_smooth[i]=psi[0]+sum;
+        
+        if (u>B-h1)
+        {
+            sum=0;
+            for (j=0;j<=m1;j++)
+            {
+                if (uu[j]<=B-2*h1)
+                    sum += pp[j];
+                if (B-2*h1<uu[j] && uu[j]<=B)
+                {
+                    sum += KK((B-h1-uu[j])/h1)*pp[j];
+                    sum += (u-B+h1)*K((B-h1-uu[j])/h1)*pp[j]/h1;
+                }
+            }
+            psi_smooth[i]=psi[0]+sum;
+        }
+        
+        if (u<A+h1)
+        {
+            sum=0;
+            for (j=0;j<=m1;j++)
+            {
+                if (uu[j]<=A+2*h1)
+                {
+                    sum += KK((A+h1-uu[j])/h1)*pp[j];
+                    sum += (u-A-h1)*K((A+h1-uu[j])/h1)*pp[j]/h1;
+                }
+            }
+            psi_smooth[i]=psi[0]+sum;
+        }
+        
     }
     
     for (i=0;i<n;i++)
@@ -241,7 +274,7 @@ double criterion(double alpha[])
         if (vv[i]<=B-h && vv[i]>=A+h)
         {
             sum=0;
-            for (j=0;j<m2;j++)
+            for (j=0;j<m1;j++)
                 sum+= K((vv[i]-uu[j])/h)*pp[j]/h;
             derivative[i]=sum;
         }
@@ -249,7 +282,7 @@ double criterion(double alpha[])
         if (vv[i]>B-h)
         {
             sum=0;
-            for (j=0;j<m2;j++)
+            for (j=0;j<m1;j++)
             {
                 sum += K((B-h-uu[j])/h)*pp[j]/h;
                 sum += (vv[i]-B+h)*Kprime((B-h-uu[j])/h)*pp[j]/SQR(h);
@@ -260,7 +293,7 @@ double criterion(double alpha[])
         if (vv[i]<A+h)
         {
             sum=0;
-            for (j=0;j<m2;j++)
+            for (j=0;j<m1;j++)
             {
                 sum += K((A+h-uu[j])/h)*pp[j]/h;
                 sum += (vv[i]-A-h)*Kprime((A+h-uu[j])/h)*pp[j]/SQR(h);
@@ -277,7 +310,6 @@ double criterion(double alpha[])
     {
         for (i=0;i<n;i++)
             f[j] += xx[i][j]*derivative[i]*(psi[i]-yy[i]);
-        //f[j] += xx[i][j]*(psi[i]-yy[i]);
     }
     
     for (j=0;j<m;j++)
@@ -296,10 +328,8 @@ double criterion(double alpha[])
     for (i=0;i<m;i++)
         sum += SQR(f[i]);
     
-    /*sum=0;
-     
-    for (i=0;i<n;i++)
-         sum += SQR(psi_smooth[i]-yy[i])/n;*/
+    //for (i=0;i<n;i++)
+        //sum += SQR(psi_smooth[i]-yy[i])/n;
     
     delete[] uu; delete[] pp;
     

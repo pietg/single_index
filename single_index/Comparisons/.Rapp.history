@@ -12379,3 +12379,199 @@ ese<-ComputeESE(X,y,sse_hat,m)#
     plot(c(-100,-100),xlim=c(min(x2),max(x2)), ylim=c(min(y2,y0),max(y2,y0)), main= "",ylab="",xlab="",bty="n",las=1)#
     lines(x2,y2,lwd=2)#
     lines(x0,y0,lwd=2,col="red",lty=2)
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+rm(list=ls())#
+library(Rcpp)#
+library(simest)#
+args(sim.est)#
+library(EDR)#
+library(MASS)#
+source("NewSimEst.R")#
+sourceCpp("SSE.cpp")#
+sourceCpp("ESE.cpp")#
+sourceCpp("LSE.cpp")#
+sourceCpp("spline.cpp")#
+#
+  NumIt = 100#
+  n = 1000#
+  m= 3#
+  sigma = 1#
+  #out=matrix(0,NumIt,m)#
+  timeMat <- NULL#
+   normMat <- matrix(0, nrow= NumIt, ncol= 6)#
+  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","PLSE")#
+for (j in 1: NumIt){#
+  sim = 101+j#
+  set.seed(sim)#
+  print(j)#
+#
+  a0 = c(rep(1,m))/sqrt(m)#
+	X = matrix(runif(m*n,1,2),n,m, byrow = FALSE)#
+	#X = matrix(rnorm(m*n,0,sigma),n,m, byrow = FALSE)#
+	z=X%*%a0#
+	y=(z)^3 + rnorm(n,0,sigma)#
+#
+	# EDR estimate proposed by Hristache et al.#
+	starter_edr = proc.time()#
+	EDR <- edr(X,y,method = "HJPS")#
+	edr_hat = -summary(EDR)$Rhat[1,]#
+	time_edr = (proc.time() -starter_edr)[3]#
+	# SSE#
+	starter_sse = proc.time()#
+	SSE <- ComputeSSE(X,y,c(1,rep(0,m-1)),m)#
+	sse_hat = SSE$alpha#
+	time_sse = (proc.time() -starter_sse)[3]#
+	# ESE#
+	starter_ese = proc.time()#
+	ESE <- ComputeESE(X,y,sse_hat,m)#
+	ese_hat = ESE$alpha#
+	time_ese = (proc.time() -starter_ese)[3]#
+	# LSE#
+	starter_lse = proc.time()#
+	LSE <- ComputeLSE(X,y,c(1,rep(0,m-1)),m)#
+	lse_hat = LSE$alpha#
+	time_lse = (proc.time() -starter_lse)[3]#
+	# spline#
+	starter_spline = proc.time()#
+	spline <- Compute_spline(X,y,sse_hat,m)#
+	spline_hat = spline$alpha#
+	time_spline = (proc.time() -starter_spline)[3]#
+#
+  #PLSE with sse_hat as starting point#
+  starter_PLSE= proc.time()#
+  PLSE_hat <- Alter_Min_Simest(X, y, beta_init = sse_hat, lambda = 0.1, method = "smooth.pen", nmax= 100, maxit=100)#
+  time_PLSE = (proc.time() -starter_PLSE)[3] #
+#
+  normMat[j,]  = c(norm((edr_hat- a0), "2"),norm((sse_hat- a0), "2"),norm((ese_hat- a0), "2"),norm((lse_hat-a0), "2"),norm((spline_hat-a0), "2"),norm((PLSE_hat-a0), "2"))#
+timeMat<-rbind(timeMat,c(time_edr,time_sse,time_ese,time_lse,time_spline,time_PLSE))#
+}#
+#
+colnames(timeMat) <- c("EDR","SSE","ESE","LSE","spline","PLSE")#
+pdf("BoxPlot_alpha_err_and_time.pdf")#
+boxplot(normMat, main= "Boxplot of |alpha_hat-alpha_0|", las=2)#
+boxplot(timeMat, main="Run Times", las=2) #
+dev.off()#
+#
+ese<-Compute_spline(X,y,sse_hat,m)#
+#
+	A <- ESE$psi#
+	B <- ESE$derivative#
+	C <- ESE$data#
+#
+    x1<-A[,1]#
+    y1<-A[,2]#
+    x2<-B[,1]#
+    y2<-B[,2]#
+    x<-C[,1]#
+   	y<-C[,2]#
+#
+    f <- function(x) {x^3}#
+    x0<-seq(min(x1),max(x1),by=0.01)#
+    y0<-f(x0)#
+    plot(c(-10000,-10000),xlim=c(min(x1),max(x1)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x1,y1,col="blue",lwd=2)#
+    lines(x0,y0,lwd=2,col="red",lty=2)#
+    points(x,y,pch = 21)#
+    g <- function(x) {3*x^2}#
+    x0<-seq(min(x2),max(x2),by=0.1)#
+    y0<-g(x0)#
+    plot(c(-100,-100),xlim=c(min(x2),max(x2)), ylim=c(min(y2,y0),max(y2,y0)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x2,y2,lwd=2)#
+    lines(x0,y0,lwd=2,col="red",lty=2)
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+rm(list=ls())#
+library(Rcpp)#
+library(simest)#
+args(sim.est)#
+library(EDR)#
+library(MASS)#
+source("NewSimEst.R")#
+sourceCpp("SSE.cpp")#
+sourceCpp("ESE.cpp")#
+sourceCpp("LSE.cpp")#
+#
+  NumIt = 100#
+  n = 1000#
+  m= 3#
+  sigma = 1#
+  #out=matrix(0,NumIt,m)#
+  timeMat <- NULL#
+   normMat <- matrix(0, nrow= NumIt, ncol= 5)#
+  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","PLSE")#
+for (j in 1: NumIt){#
+  sim = 101+j#
+  set.seed(sim)#
+  print(j)#
+#
+  a0 = c(rep(1,m))/sqrt(m)#
+	#X = matrix(runif(m*n,1,2),n,m, byrow = FALSE)#
+	X = matrix(rnorm(m*n,0,sigma),n,m, byrow = FALSE)#
+	z=X%*%a0#
+	y=(z)^3 + rnorm(n,0,sigma)#
+#
+	# EDR estimate proposed by Hristache et al.#
+	starter_edr = proc.time()#
+	EDR <- edr(X,y,method = "HJPS")#
+	edr_hat = -summary(EDR)$Rhat[1,]#
+	time_edr = (proc.time() -starter_edr)[3]#
+	# SSE#
+	starter_sse = proc.time()#
+	SSE <- ComputeSSE(X,y,c(1,rep(0,m-1)),m)#
+	sse_hat = SSE$alpha#
+	time_sse = (proc.time() -starter_sse)[3]#
+	# ESE#
+	starter_ese = proc.time()#
+	ESE <- ComputeESE(X,y,sse_hat,m)#
+	ese_hat = ESE$alpha#
+	time_ese = (proc.time() -starter_ese)[3]#
+	# LSE#
+	starter_lse = proc.time()#
+	LSE <- ComputeLSE(X,y,c(1,rep(0,m-1)),m)#
+	lse_hat = LSE$alpha#
+	time_lse = (proc.time() -starter_lse)[3]#
+#
+  #PLSE with sse_hat as starting point#
+  starter_PLSE= proc.time()#
+  PLSE_hat <- Alter_Min_Simest(X, y, beta_init = sse_hat, lambda = 0.1, method = "smooth.pen", nmax= 100, maxit=100)#
+  time_PLSE = (proc.time() -starter_PLSE)[3] #
+#
+  normMat[j,]  = c(norm((edr_hat- a0), "2"),norm((sse_hat- a0), "2"),norm((ese_hat- a0), "2"),norm((lse_hat-a0), "2"),norm((PLSE_hat-a0), "2"))#
+timeMat<-rbind(timeMat,c(time_edr,time_sse,time_ese,time_lse,time_PLSE))#
+}#
+#
+colnames(timeMat) <- c("EDR","SSE","ESE","LSE","PLSE")#
+pdf("BoxPlot_alpha_err_and_time.pdf")#
+boxplot(normMat, main= "Boxplot of |alpha_hat-alpha_0|", las=2)#
+boxplot(timeMat, main="Run Times", las=2) #
+dev.off()#
+#
+ese<-ComputeESE(X,y,sse_hat,m)#
+#
+	A <- ese$psi#
+	B <- ese$derivative#
+	C <- ese$data#
+#
+    x1<-A[,1]#
+    y1<-A[,2]#
+    x2<-B[,1]#
+    y2<-B[,2]#
+    x<-C[,1]#
+   	y<-C[,2]#
+#
+    f <- function(x) {x^3}#
+    x0<-seq(min(x1),max(x1),by=0.01)#
+    y0<-f(x0)#
+    plot(c(-10000,-10000),xlim=c(min(x1),max(x1)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x1,y1,col="blue",lwd=2)#
+    lines(x0,y0,lwd=2,col="red",lty=2)#
+    points(x,y,pch = 21)#
+    g <- function(x) {3*x^2}#
+    x0<-seq(min(x2),max(x2),by=0.1)#
+    y0<-g(x0)#
+    plot(c(-100,-100),xlim=c(min(x2),max(x2)), ylim=c(min(y2,y0),max(y2,y0)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x2,y2,lwd=2)#
+    lines(x0,y0,lwd=2,col="red",lty=2)
