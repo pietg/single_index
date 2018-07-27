@@ -27,3 +27,7 @@ the estimate given by SSE, and EDR does not need a starting value. The minimizat
 algorithm of Nelder-Mead is used instead of the Hooke-Jeeves method, used before.
 For running the scripts, one needs to be able to run the package Rcpp. One also needs to
 copy the other files of the directory, since most of them are used in the scripts.
+Note that the estimates SSE,ESE and LSE expect data from a model where psi is monotone
+increasing; otherwise erratic results can be expected. Also note that the efficient score
+estimator can indeed give a significant improvement on SSE, when started at the result of
+the SSE.

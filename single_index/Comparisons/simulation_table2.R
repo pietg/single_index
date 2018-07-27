@@ -13,7 +13,7 @@ sourceCpp("ESE.cpp")
 sourceCpp("LSE.cpp")
 
   NumIt = 100
-  n = 500
+  n = 1000
   m= 3
   sigma = 1
   
