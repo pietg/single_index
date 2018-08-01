@@ -5,7 +5,7 @@ link-free estimate, using the methods of section 4.2 and 5 of "Score estimation 
 monotone single index model" by Fadoua Balabdaoui, Piet Groeneboom and Kim Hendrickx,
 https://arxiv.org/abs/1712.05593
 
-Then R scripts simulation_table1.R (for Table 1 in the paper) and simulation_table2.R
+The R scripts simulation_table1.R (for Table 1 in the paper) and simulation_table2.R
 (for Table 2 in the paper) in the directory ``Comparisons'' compare the simple score
 estimator (SSE), the efficient score estimator (ESE) and the least squares estimator (LSE)
 with the algorithm of the R package EDR and the penalized least squares estimator (PLSE)
