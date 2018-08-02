@@ -15,15 +15,15 @@ given in BoxPlot_alpha_err_and_time_table1_n=5000.pdf, where the non-efficient s
 score estimator SSE gives a better performance, both in computing time and values.
 I could not remove the text that is produced during the runs for the EDR package.
 
-There exists an R package ``simest'' for the PLSE, but for simplicity I programmed the
+There exists an R package "simest" for the PLSE, but for simplicity I programmed the
 procedure here from first principles, using the Reinsch algorithm as explained in the book
-``Nonparametric Regression and Generalized Linear Models'' of Green and Silverman (1994),
+"Nonparametric Regression and Generalized Linear Models" of Green and Silverman (1994),
 using systematically the band matrix structure to speed things up. The simple C++ code is
 given in spline.cpp.
 
 At the end of the runs of simulation_table1.R and simulation_table2.R the estimate of psi
-computed in spline.cpp is shown. If one experiments with other sample
-sizes and dimensions (by changing parameters at the beginning of the files
+computed in spline.cpp is shown. If one experiments with other sample sizes and
+dimensions (by changing parameters at the beginning of the files
 simulation_table1.R and simulation_table2.R), one might want to change the bandwidth or
 the smoothing parameter mu in spline.cpp.
 
@@ -34,7 +34,7 @@ algorithm of Nelder-Mead is used instead of the Hooke-Jeeves method, used before
 
 For running the scripts, one needs to be able to run the package Rcpp. One also needs to
 copy the other files of the directory, since most of them are used in the scripts.
-Note that the estimates SSE,ESE and LSE expect data from a model where psi is monotone
+Note that the estimates SSE, ESE and LSE expect data from a model where psi is monotone
 increasing; otherwise erratic results can be expected. Also note that the efficient score
 estimator can indeed give a significant improvement on SSE, when started at the result of
 the SSE.
