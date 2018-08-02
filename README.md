@@ -6,13 +6,15 @@ monotone single index model" by Fadoua Balabdaoui, Piet Groeneboom and Kim Hendr
 https://arxiv.org/abs/1712.05593
 
 The R scripts simulation_table1.R (for Table 1 in the paper) and simulation_table2.R
-(for Table 2 in the paper) in the directory ``Comparisons'' compare the simple score
+(for Table 2 in the paper) in the directory "Comparisons" compare the simple score
 estimator (SSE), the efficient score estimator (ESE) and the least squares estimator (LSE)
-with the algorithm of the R package EDR and the a penalized least squares estimator (PLSE),
+with the algorithm of the R package EDR and the penalized least squares estimator (PLSE),
 using smoothing splines. The EDR package takes much longer than the other algorithms for
 larger sample sizes, but is not superior to the other algorithms. In fact, an example is
 given in BoxPlot_alpha_err_and_time_table1_n=5000.pdf, where the non-efficient simple
 score estimator SSE gives a better performance, both in computing time and values.
+Also, EDR is not behaving well for small sample sizes, as can be seen from
+BoxPlot_alpha_err_and_time_table2_n=50.pdf.
 I could not remove the text that is produced during the runs for the EDR package.
 
 There exists an R package "simest" for the PLSE, but for simplicity I programmed the
