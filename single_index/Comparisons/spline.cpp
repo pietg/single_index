@@ -1,9 +1,9 @@
 //
-//  ComputeSSE
-//  Simple score estimator for the single index model
+//  Compute spline
+//  Spline estimation for the single index model
 //
 //  Created by Piet Groeneboom on 04-05-18.
-//  Copyright (c) 2018 Piet. All rights reserved.
+//  Copyright (c) 2018 Piet Groeneboom. All rights reserved.
 //
 
 #include <stdlib.h>
@@ -27,41 +27,40 @@ typedef struct
 }
 data_object;
 
-int m,n;
-double **xx,*yy,*vv,*cumw,*cs,*f,*psi,*psi_smooth,*derivative,lambda,*alpha_init;
+int n,m,m1;
+double **xx,*yy,*vv,*f,*psi,mu;
+double **q,*d,*D,**L,**b,**b_inv;
+double lambda;
+
 
 double  criterion(double alpha[]);
 void    sort_alpha(int m, int n, double **xx, double alpha[], double vv[], double yy[]);
-void    convexmin(int n, double cumw[], double cs[], double y[]);
 int     CompareTime(const void *a, const void *b);
-
-void    nelmin (double fn ( double x[] ), int n, double start[], double xmin[],
-                double *ynewlo, double reqmin, double step[], int konvge, int kcount,
+void    nelmin ( double fn ( double x[] ), int n, double start[], double xmin[],
+             double *ynewlo, double reqmin, double step[], int konvge, int kcount,
                 int *icount, int *numres, int *ifault );
-double  KK(double x);
-double  K(double x);
-double  Kprime(double x);
 void    swap(double *x,double *y);
+void    Compute_Q(int n, double q[], double b[]);
+void    Compute_cubic_spline(double lambda);
+void    Cholesky_sol(int n, double b[], double z[], double x[]);
+void    Cholesky_dec(int n, double b[], double D[], double **L);
 
 
 // [[Rcpp::export]]
 
-List ComputeESE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
+List Compute_spline(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
 {
     int             i,j;
     double          f2;
-    double          *alpha;
+    double          *alpha,*alpha_init;
     double          *step,reqmin,ynewlo;
     int             icount,ifault,kcount,konvge,numres;
-    
-    
+       
     // determine the sample size
     
     n = (int)(y.size());
-    
-    // m is the dimension
-    
     m= (int)m1;
+    mu=0.05;
     
     reqmin=1.0e-8;
     konvge=10;
@@ -71,7 +70,7 @@ List ComputeESE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
     
     for (i=0;i<m;i++)
         step[i]=1.0;
-    
+
     // copy the data vector for use of the C++ procedures
     
     yy = new double[n];
@@ -96,19 +95,13 @@ List ComputeESE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
     
     for (i=0;i<m;i++)
         alpha_init[i]=(double)alpha0(i);
-    
-    cumw = new double[n+1];
-    cs = new double[n+1];
+  
     psi  = new double[n];
-    psi_smooth  = new double[n];
-    derivative  = new double[n];
-    
-    cumw[0]=cs[0]=0;
     
     nelmin(criterion,m,alpha_init,alpha,&ynewlo,reqmin,step,konvge,kcount,&icount,&numres,&ifault);
     
     f2 = criterion(alpha);
-    
+
     NumericMatrix out0 = NumericMatrix(n,2);
     
     for (i=0;i<n;i++)
@@ -116,15 +109,14 @@ List ComputeESE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
         out0(i,0)=vv[i];
         out0(i,1)=yy[i];
     }
-
-
+    
     NumericVector out1 = NumericVector(m);
     
     // computation of alpha
     
     for (i=0;i<m;i++)
         out1(i)=alpha[i];
-        
+    
     NumericMatrix out2 = NumericMatrix(n,2);
     
     for (i=0;i<n;i++)
@@ -133,33 +125,15 @@ List ComputeESE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
         out2(i,1)=psi[i];
     }
     
-    NumericMatrix out3 = NumericMatrix(n,2);
-    
-    for (i=0;i<n;i++)
-    {
-        out3(i,0)=vv[i];
-        out3(i,1)=psi_smooth[i];
-    }
-    
-    NumericMatrix out4 = NumericMatrix(n,2);
-    
-    for (i=0;i<n;i++)
-    {
-        out4(i,0)=vv[i];
-        out4(i,1)=derivative[i];
-    }
-    
-    
     // Number of iterations of Nelder-Mead
     
-    int out5 = icount;
-
+    int out3 = icount;
+        
+        
     // make the list for the output, containing alpha and the estimate of psi
-    
-     List out = List::create(Rcpp::Named("data")=out0,Rcpp::Named("alpha")=out1,Rcpp::Named("psi")=out2,Rcpp::Named("psi_smooth")=out3,Rcpp::Named("derivative")=out4,Rcpp::Named("niter")=out5);
-    
-    // The last element shows the number of iterations in the Nelder-Mead algorithm
-    
+        
+    List out = List::create(Rcpp::Named("data")=out0,Rcpp::Named("alpha")=out1,Rcpp::Named("psi")=out2,
+                                            Rcpp::Named("niter")=out3);
     // free memory
    
     for (i=0;i<n;i++)
@@ -167,19 +141,17 @@ List ComputeESE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
     
     delete[] xx;
     
-    delete[] yy, delete[] vv; delete[] alpha; delete[] alpha_init; delete[] f;
-    delete[] cumw; delete[] cs; delete[] psi;  delete[] psi_smooth; delete[] derivative; delete[] step;
+    delete[] yy, delete[] vv; delete[] alpha; delete[] alpha_init; delete[] f; delete[] psi; delete[] step;
     
     return out;
 }
 
+// This is the criterion with the derivative of the spline
+
 double criterion(double alpha[])
 {
-    int i,j,m1;
-    double h1,h,u,lambda,sum,sum1,*uu,*pp,A,B;
-    
-    uu= new double[n];
-    pp= new double[n];
+    int i,j;
+    double sum;
     
     sum=0;
     
@@ -191,200 +163,18 @@ double criterion(double alpha[])
     
     sort_alpha(m,n,xx,alpha,vv,yy);
     
-    A=vv[0];
-    B=vv[n-1];
-    
-    h1=0.5*(B-A)*pow((double)n,-1.0/5);
-    h=0.5*(B-A)*pow((double)n,-1.0/7);
-    
-    //printf("%15.10f\n",h);
-    
-    for (i=1;i<=n;i++)
-    {
-        cumw[i]=i*1.0;
-        cs[i]=cs[i-1]+yy[i-1];
-    }
-    
-    convexmin(n,cumw,cs,psi);
-    
-    j=-1;
-    
-    for (i=1;i<n;i++)
-    {
-        if (psi[i]>psi[i-1])
-        {
-            j++;
-            uu[j]=vv[i];
-            pp[j]=psi[i]-psi[i-1];
-        }
-    }
-    
-    m1=j;
-    
-    for (i=0;i<n;i++)
-    {
-        u=vv[i];
-        
-        if (u<=B && u>=A)
-        {
-            sum=0;
-            for (j=0;j<=m1;j++)
-            {
-                if (uu[j]<= u-h1)
-                    sum += pp[j];
-                
-                if (u-h1<uu[j] && uu[j]<u+h1)
-                    sum += KK((u-uu[j])/h1)*pp[j];
-            }
-            psi_smooth[i]=psi[0]+sum;
-        }
-    }
-    
-    for (i=0;i<n;i++)
-    {
-        if (vv[i]<=B-h && vv[i]>=A+h)
-        {
-            sum=0;
-            for (j=0;j<m1;j++)
-                sum+= K((vv[i]-uu[j])/h)*pp[j]/h;
-            derivative[i]=sum;
-        }
-        
-        if (vv[i]>B-h)
-        {
-            sum=0;
-            for (j=0;j<m1;j++)
-            {
-                sum += K((B-h-uu[j])/h)*pp[j]/h;
-                sum += (vv[i]-B+h)*Kprime((B-h-uu[j])/h)*pp[j]/SQR(h);
-            }
-            derivative[i]=sum;
-        }
-        
-        if (vv[i]<A+h)
-        {
-            sum=0;
-            for (j=0;j<m1;j++)
-            {
-                sum += K((A+h-uu[j])/h)*pp[j]/h;
-                sum += (vv[i]-A-h)*Kprime((A+h-uu[j])/h)*pp[j]/SQR(h);
-            }
-            derivative[i]=sum;
-        }
-    }
-    
-    
-    for (j=0;j<m;j++)
-        f[j]=0;
-    
-    for (j=0;j<m;j++)
-    {
-        for (i=0;i<n;i++)
-            f[j] += xx[i][j]*derivative[i]*(psi[i]-yy[i]);
-    }
-    
-    for (j=0;j<m;j++)
-        f[j]/=n;
-    
-    lambda=0;
-    
-    for (i=0;i<m;i++)
-        lambda += alpha[i]*f[i];
-    
-    for (i=0;i<m;i++)
-        f[i] -= lambda*alpha[i];
+    Compute_cubic_spline(mu);
     
     sum=0;
+
+    for (j=0;j<n;j++)
+        sum += SQR(psi[j]-yy[j])/n;
     
-    for (i=0;i<m;i++)
-        sum += SQR(f[i]);
-    
-    sum1=0;
-    
-    for (i=0;i<n;i++)
-        sum1 += SQR(psi[i]-yy[i])/n;
-    
-    delete[] uu; delete[] pp;
-    
-    return sum+sum1;
-    
+    return sum;
 }
 
 
 
-void convexmin(int n, double cumw[], double cs[], double y[])
-{
-    int	i, j, m;
-    
-    y[0] = cs[1]/cumw[1];
-    for (i=2;i<=n;i++)
-    {
-        y[i-1] = (cs[i]-cs[i-1])/(cumw[i]-cumw[i-1]);
-        if (y[i-2]>y[i-1])
-        {
-            j = i;
-            while (y[j-2] > y[i-1] && j>1)
-            {
-                j--;
-                if (j>1)
-                    y[i-1] = (cs[i]-cs[j-1])/(cumw[i]-cumw[j-1]);
-                else
-                    y[i-1] = cs[i]/cumw[i];
-                for (m=j;m<i;m++)	y[m-1] = y[i-1];
-            }
-        }
-    }
-}
-
-double KK(double x)
-{
-  double u,y;
-  
-  u=x*x;
-  
-  if (u<=1)
-    y = (16.0 + 35*x - 35*pow(x,3) + 21*pow(x,5) - 5*pow(x,7))/32.0;
-  else
-  {
-    if (x>1)
-      y=1;
-    else
-      y=0;
-    
-  }
-  
-  return y;
-}
-
-
-double K(double x)
-{
-    double u,y;
-    
-    u=x*x;
-    
-    if (u<=1)
-        y=(35.0/32)*pow(1-u,3);
-    else
-        y=0.0;
-    
-    return y;
-}
-
-
-double Kprime(double x)
-{
-    double u,y;
-    
-    u=x*x;
-    
-    if (u<=1)
-        y = -(105.0/16)*x*pow(1-u,2);
-    else
-        y=0.0;
-    
-    return y;
-}
 
 int CompareTime(const void *a, const void *b)
 {
@@ -448,6 +238,177 @@ void sort_alpha(int m, int n, double **xx, double alpha[], double vv[], double y
     delete[] xx_new;
 }
 
+void Compute_cubic_spline(double lambda)
+{
+    int i,j,m;
+    double *a,*b,*c,*d,*q,*gamma;
+    
+    m=3*n;
+    
+    a= new double[m+1];
+    b= new double[m+1];
+    c= new double[n+1];
+    d= new double[n+1];
+    
+    q= new double[m+1];
+    
+    gamma= new double[n];
+    
+    for (i=0;i<=m;i++)
+        a[i]=b[i]=0;
+    
+    for (i=0;i<=n;i++)
+        c[i]=d[i]=0;
+    
+    
+    for (i=0;i<=m;i++)
+        q[i]=0;
+    
+    
+    Compute_Q(n,q,b);
+    
+    for (j=2;j<=n-1;j++)
+        a[2*(j-2)+j-1] += (vv[j]-vv[j-2])/3;
+    
+    for (j=2;j<n-1;j++)
+        a[2*(j-1)+j-1] += (vv[j]-vv[j-1])/6;
+    
+    
+    for (i=1;i<=m;i++)
+        a[i] += lambda*b[i];
+    
+    for (i=2;i<=n-1;i++)
+        c[i-1]=(yy[i]-yy[i-1])/(vv[i]-vv[i-1])-(yy[i-1]-yy[i-2])/(vv[i-1]-vv[i-2]);
+    
+    Cholesky_sol(n-2,a,c,gamma);
+    
+    d[1] += q[1]*gamma[1];
+    
+    d[2] += q[2]*gamma[1]+q[3]*gamma[2];
+    
+    for (i=3;i<=n-2;i++)
+    {
+        for (j=i-2;j<=i;j++)
+            d[i] += q[i+2*(j-1)]*gamma[j];
+    }
+    
+    for (j=n-3;j<=n-2;j++)
+        d[n-1] += q[n-1+2*(j-1)]*gamma[j];
+    
+    d[n] += q[n+2*(n-3)]*gamma[n-2];
+    
+    for (i=0;i<n;i++)
+        psi[i]=yy[i]-lambda*d[i+1];
+    
+    delete[] a; delete[] b; delete[] c; delete[] d;
+    delete[] q; delete[] gamma;
+    
+}
+
+
+void Compute_Q(int n, double q[], double b[])
+{
+    int i,j,k;
+    
+    for (j=2;j<=n-1;j++)
+    {
+        q[j-1+2*(j-2)] += 1.0/(vv[j-1]-vv[j-2]);
+        q[j+2*(j-2)] += -1.0/(vv[j-1]-vv[j-2])-1.0/(vv[j]-vv[j-1]);
+        q[j+1+2*(j-2)] += 1.0/(vv[j]-vv[j-1]);
+    }
+    
+    
+    for (i=2;i<=n-1;i++)
+    {
+        for (j=i;j<=i+2;j++)
+        {
+            for (k=j-1;k<=i+1;k++)
+            {
+                if (k>=1)
+                    b[i-1+2*(j-2)] += q[k+2*(i-2)]*q[k+2*(j-2)];
+            }
+        }
+    }
+    
+    
+}
+
+
+// The following two routine implement section 2.6.1 and 2.6.2 of Green and Silverman (1994)
+//
+
+void Cholesky_dec(int n, double b[], double D[], double **L)
+{
+    int i;
+    
+    // b is an an array version of the matrix B in (2.29) on p. 25 of Green and Silverman (1994)
+    // B[i][j] = b[(2*(i-1)+j]
+    
+    D[1]=b[1];
+    L[2][1] = b[3]/D[1];
+    D[2]= b[4]-SQR(L[2][1])*D[1];
+    
+    for (i=3;i<=n;i++)
+    {
+        L[i][2] = b[2*(i-1)+i-2]/D[i-2];
+        L[i][1] = (b[2*(i-1)+i-1]-L[i-1][1]*L[i][2]*D[i-2])/D[i-1];
+        D[i]=b[2*(i-1)+i]-SQR(L[i][1])*D[i-1]-SQR(L[i][2])*D[i-2];
+    }
+    
+}
+
+
+void Cholesky_sol(int n, double b[], double z[], double x[])
+{
+    int i,j;
+    double **L,*D;
+    double *u,*v;
+    
+    
+    u= new double[n+1];
+    v= new double[n+1];
+    
+    D= new double[n+1];
+    
+    L = new double *[n+1];
+    for (i=0;i<n+1;i++)
+        L[i] = new double [3];
+    
+    for (i=1;i<=n;i++)
+    {
+        D[i]=0;
+        for (j=0;j<=2;j++)
+            L[i][j]=0;
+    }
+    
+    Cholesky_dec(n,b,D,L);
+    
+    u[1]=z[1];
+    u[2]=z[2]-L[2][1]*u[1];
+    
+    for (i=3;i<=n;i++)
+        u[i]=z[i]-L[i][1]*u[i-1]-L[i][2]*u[i-2];
+    
+    for (i=1;i<=n;i++)
+        v[i]=u[i]/D[i];
+    
+    x[n]=v[n];
+    x[n-1]=v[n-1]-L[n][1]*x[n];
+    
+    for (i=n-2;i>=1;i--)
+        x[i]=v[i]-L[i+1][1]*x[i+1]-L[i+2][2]*x[i+2];
+    
+    delete[] u;
+    delete[] v;
+    
+    delete[] D;
+    
+    for (i=0;i<n+1;i++)
+        delete[] L[i];
+    
+    delete[] L;
+    
+}
 
 void nelmin ( double fn ( double x[] ), int n, double start[], double xmin[],
              double *ynewlo, double reqmin, double step[], int konvge, int kcount,
@@ -931,7 +892,6 @@ void nelmin ( double fn ( double x[] ), int n, double start[], double xmin[],
     
     return;
 }
-
 
 void swap(double *x,double *y)
 {

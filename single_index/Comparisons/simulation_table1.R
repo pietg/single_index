@@ -3,21 +3,17 @@
 ########################################################
 rm(list=ls())
 library(Rcpp)
-library(simest)
-args(sim.est)
 library(EDR)
-library(MASS)
-source("NewSimEst.R")
 sourceCpp("SSE.cpp")
 sourceCpp("ESE.cpp")
 sourceCpp("LSE.cpp")
+sourceCpp("spline.cpp")
 
   NumIt = 100
-  n = 1000
+  n = 100
   m= 3
   sigma = 1
   
-  #out=matrix(0,NumIt,m)
   timeMat <- NULL
    normMat <- matrix(0, nrow= NumIt, ncol= 5)
   colnames(normMat) <- c("EDR", "SSE","ESE","LSE","PLSE")
@@ -44,6 +40,12 @@ for (j in 1: NumIt){
 	edr_hat = -summary(EDR)$Rhat[1,]
 	time_edr = (proc.time() -starter_edr)[3]
 	
+	# LSE
+	starter_lse = proc.time()
+	LSE <- ComputeLSE(X,y,c(1,rep(0,m-1)),m)
+	lse_hat = LSE$alpha
+	time_lse = (proc.time() -starter_lse)[3]
+	
 	# SSE
 	starter_sse = proc.time()
 	SSE <- ComputeSSE(X,y,c(1,rep(0,m-1)),m)
@@ -56,17 +58,13 @@ for (j in 1: NumIt){
 	ese_hat = ESE$alpha
 	time_ese = (proc.time() -starter_ese)[3]
 	
-	# LSE
-	starter_lse = proc.time()
-	LSE <- ComputeLSE(X,y,c(1,rep(0,m-1)),m)
-	lse_hat = LSE$alpha
-	time_lse = (proc.time() -starter_lse)[3]
-
-  #PLSE with sse_hat as starting point
-  starter_PLSE= proc.time()
-  PLSE_hat <- Alter_Min_Simest(X, y, beta_init = sse_hat, lambda = 0.1, method = "smooth.pen", nmax= 100, maxit=100)
-  time_PLSE = (proc.time() -starter_PLSE)[3] 
-
+	# PLSE
+	starter_PLSE = proc.time()
+	PLSE <- Compute_spline(X,y,c(1,rep(0,m-1)),m)
+	PLSE_hat = PLSE$alpha
+	time_PLSE = (proc.time() -starter_PLSE)[3]
+	
+ 
   normMat[j,]  = c(norm((edr_hat- a0), "2"),norm((sse_hat- a0), "2"),norm((ese_hat- a0), "2"),norm((lse_hat-a0), "2"),norm((PLSE_hat-a0), "2"))
 timeMat<-rbind(timeMat,c(time_edr,time_sse,time_ese,time_lse,time_PLSE))
 }
@@ -77,18 +75,14 @@ boxplot(normMat, main= "Boxplot of |alpha_hat-alpha_0|", las=2)
 boxplot(timeMat, main="Run Times", las=2) 
 dev.off()
 
-ese<-ComputeESE(X,y,sse_hat,m)
 
-	A <- ese$psi
-	B <- ese$derivative
-	C <- ese$data
+	A <- PLSE$psi
+	B <- PLSE$data
 
     x1<-A[,1]
     y1<-A[,2]
-    x2<-B[,1]
-    y2<-B[,2]
-    x<-C[,1]
-   	y<-C[,2]
+    x<-B[,1]
+   	y<-B[,2]
 
     f <- function(x) {x^3}
     x0<-seq(min(x1),max(x1),by=0.01)
@@ -97,12 +91,4 @@ ese<-ComputeESE(X,y,sse_hat,m)
     lines(x1,y1,col="blue",lwd=2)
     lines(x0,y0,lwd=2,col="red",lty=2)
     points(x,y,pch = 21)
-
-   
-    g <- function(x) {3*x^2}
-    x0<-seq(min(x2),max(x2),by=0.1)
-    y0<-g(x0)
-    plot(c(-100,-100),xlim=c(min(x2),max(x2)), ylim=c(min(y2,y0),max(y2,y0)), main= "",ylab="",xlab="",bty="n",las=1)
-    lines(x2,y2,lwd=2)
-    lines(x0,y0,lwd=2,col="red",lty=2)
    
