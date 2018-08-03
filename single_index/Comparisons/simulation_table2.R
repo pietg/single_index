@@ -55,7 +55,7 @@ for (j in 1: NumIt){
 	
 	# ESE
 	starter_ese = proc.time()
-	ESE <- ComputeESE(X,y,lse_hat,m)
+	ESE <- ComputeESE(X,y,sse_hat,m)
 	ese_hat = ESE$alpha
 	time_ese = (proc.time() -starter_ese)[3]
 		
