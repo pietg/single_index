@@ -13,8 +13,9 @@ using smoothing splines. The EDR package takes much longer than the other algori
 larger sample sizes, but is not superior to the other algorithms. In fact, an example is
 given in BoxPlot_alpha_err_and_time_table1_n=5000.pdf, where the non-efficient simple
 score estimator SSE gives a better performance, both in computing time and values.
-Also, EDR is not behaving well for small sample sizes, as can be seen from
-BoxPlot_alpha_err_and_time_table2_n=50.pdf.
+EDR can also have bad behavior for small sample sizes, as is seen from
+BoxPlot_alpha_err_and_time_table2_n=50.pdf, which contains the results for 50 observations
+for the model of Table 2 of the above paper.
 I could not remove the text that is produced during the runs for the EDR package.
 
 There exists an R package "simest" for the PLSE, but for simplicity I programmed the
@@ -31,7 +32,10 @@ the smoothing parameter mu in spline.cpp.
 
 The computation of SSE, LSE and PLSE (the spline procedure) is started from alpha equal to
 (1,0,...,0) (rather far from the actual value (alpha=1/sqrt{m})(1,...,1)), ESE is started
-from the estimate given by SSE, and EDR does not need a starting value. The minimization
+from the estimate given by SSE, and EDR does not need a starting value. In fact, the 
+procedures SSE, LSE and PLSE also do not need a starting value from the user, since they
+can be started from (1,0,...,0), but the option to provide a starting value is given for
+experiments to investigate the influence of such a starting value. The minimization
 algorithm of Nelder-Mead is used instead of the Hooke-Jeeves method, used before.
 
 For running the scripts, one needs to be able to run the package Rcpp. One also needs to

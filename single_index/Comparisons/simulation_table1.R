@@ -10,7 +10,7 @@ sourceCpp("LSE.cpp")
 sourceCpp("spline.cpp")
 
   NumIt = 100
-  n = 100
+  n = 500
   m= 3
   sigma = 1
   
