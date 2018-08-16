@@ -11,4 +11,4 @@ I could not remove the text that is produced during the runs for the EDR package
 The PLSE is computed using the R package "simest", with the slight modification "NewSimEst.R", kindly provided to me by the authors of the package. At the end of the run, the least squares estimate of the link function, corresponding to the ESE algorithm, is shown for the last sample (blue step function), together with the underlying link function (red dashed function) and the points of the sample, plotted in the scale provided by the estimate of the regression parameter alpha.
 
 For running the scripts, one needs to be able to run the package Rcpp. One also needs to
-copy the other files of the directory, since most of them are used in the scripts.
+copy the other files of the directory, since most of them are used in the script.
