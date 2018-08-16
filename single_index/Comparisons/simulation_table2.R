@@ -4,14 +4,10 @@
 rm(list=ls())
 library(Rcpp)
 library(EDR)
-library(simest)
-args(sim.est)
-library(MASS)
 source("NewSimEst.R")
 sourceCpp("SSE.cpp")
 sourceCpp("ESE.cpp")
 sourceCpp("LSE.cpp")
-sourceCpp("spline.cpp")
 
   NumIt = 100
   n = 100
