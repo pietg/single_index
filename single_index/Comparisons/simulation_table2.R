@@ -9,7 +9,7 @@ sourceCpp("SSE.cpp")
 sourceCpp("ESE.cpp")
 sourceCpp("LSE.cpp")
 
-  NumIt = 100
+  NumIt = 1000
   n = 100
   m= 25
   sigma = 1
@@ -76,7 +76,7 @@ for (j in 1: NumIt){
 
 colnames(timeMat) <- c("EDR","SSE","ESE","LSE","PLSE","asymp")
 pdf("BoxPlot_alpha_err_and_time.pdf")
-boxplot(normMat, main= "Boxplot of |alpha_hat-alpha_0|", las=2)
+boxplot(normMat, main= "Boxplot of sqrt(n/d)||alpha_hat-alpha_0||_2", las=2)
 boxplot(timeMat, main="Run Times", las=2) 
 dev.off()
 
