@@ -1,5 +1,5 @@
 //
-//  link-free estimate in the single index model
+//  simple score estimate in the single index model
 //
 //  Created by Piet Groeneboom on 16/04/18.
 //  Copyright (c) 2018 Piet Groeneboom. All rights reserved.

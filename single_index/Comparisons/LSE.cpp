@@ -1,6 +1,7 @@
 //
-//  ComputeSSE
-//  Simple score estimator for the single index model
+//  ComputeLSE
+//  Least squares estimator for the single index model
+//  Nelder-Mead is used instead of Hooke-Jeeves
 //
 //  Created by Piet Groeneboom on 04-05-18.
 //  Copyright (c) 2018 Piet. All rights reserved.

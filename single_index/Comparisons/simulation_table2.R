@@ -9,7 +9,7 @@ sourceCpp("SSE.cpp")
 sourceCpp("ESE.cpp")
 sourceCpp("LSE.cpp")
 
-  NumIt = 1000
+  NumIt = 100
   n = 100
   m= 25
   sigma = 1
