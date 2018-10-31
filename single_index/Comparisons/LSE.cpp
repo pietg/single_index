@@ -47,7 +47,7 @@ List ComputeLSE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
 {
     int             i,j;
     double          f2;
-    double          *alpha,*alpha_init;
+    double          *alpha,*alpha_init,sum;
     double          *step,reqmin,ynewlo;
     int             icount,ifault,kcount,konvge,numres;
        
@@ -100,6 +100,14 @@ List ComputeLSE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
     
     nelmin(criterion,m,alpha_init,alpha,&ynewlo,reqmin,step,konvge,kcount,&icount,&numres,&ifault);
     
+    sum=0;
+    
+    for (i=0;i<m;i++)
+        sum += SQR(alpha[i]);
+    
+    for (i=0;i<m;i++)
+        alpha[i]/=sqrt(sum);
+    
     f2 = criterion(alpha);
 
     NumericMatrix out0 = NumericMatrix(n,2);
@@ -151,16 +159,6 @@ double criterion(double alpha[])
 {
     int i;
     double sum;
-    
-    sum=0;
-    
-    for (i=0;i<m;i++)
-        sum += SQR(alpha[i]);
-    
-    sum = sqrt(sum);
-    
-    for (i=0;i<m;i++)
-        alpha[i] /= sum;
     
     sort_alpha(m,n,xx,alpha,vv,yy);
     

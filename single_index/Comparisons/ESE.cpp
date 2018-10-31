@@ -56,7 +56,7 @@ double  Kprime(double x);
 List ComputeESE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
 {
     int             i,j,m,iter,nIterations;
-    double          *alpha,rho,f2;
+    double          *alpha,rho,f2,sum;
     double          *alpha_init;
     double          eps;
     
@@ -103,6 +103,14 @@ List ComputeESE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
         alpha_init[i]=(double)alpha0(i);
     
     iter=hooke(m,alpha_init,alpha,rho,eps,nIterations,&criterion);
+    
+    sum=0;
+    
+    for (i=0;i<m;i++)
+        sum += SQR(alpha[i]);
+    
+    for (i=0;i<m;i++)
+        alpha[i]/=sqrt(sum);
     
     f2 = criterion(m,alpha);
     
@@ -170,13 +178,13 @@ double criterion(int m, double alpha[])
     uu= new double[n];
     pp= new double[n];
     
-    sum=0;
+    /*sum=0;
     
     for (i=0;i<m;i++)
         sum += SQR(alpha[i]);
     
     for (i=0;i<m;i++)
-        alpha[i]/=sqrt(sum);
+        alpha[i]/=sqrt(sum);*/
     
     sort_alpha(m,n,xx,alpha,vv,yy);
     

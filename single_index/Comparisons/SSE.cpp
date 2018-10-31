@@ -55,7 +55,7 @@ List ComputeSSE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
     int             i,j,m,iter,nIterations;
     double          *alpha,rho,f2;
     double          *alpha_init;
-    double          eps;
+    double          sum,eps;
 
     
     // determine the sample size
@@ -101,6 +101,14 @@ List ComputeSSE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
         alpha_init[i]=(double)alpha0(i);
     
     iter=hooke(m,alpha_init,alpha,rho,eps,nIterations,&criterion);
+    
+    sum=0;
+    
+    for (i=0;i<m;i++)
+        sum += SQR(alpha[i]);
+    
+    for (i=0;i<m;i++)
+        alpha[i]/=sqrt(sum);
         
     f2 = criterion(m,alpha);
 
@@ -217,7 +225,7 @@ double criterion(int m, double alpha[])
     int i,j;
     double sum,lambda;
     
-    sum=0;
+    /*sum=0;
     
     for (i=0;i<m;i++)
         sum += SQR(alpha[i]);
@@ -225,7 +233,7 @@ double criterion(int m, double alpha[])
     sum = sqrt(sum);
     
     for (i=0;i<m;i++)
-        alpha[i] /= sum;
+        alpha[i] /= sum;*/
     
     sort_alpha(m,n,xx,alpha,vv,yy);
     
