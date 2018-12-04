@@ -173,7 +173,7 @@ List ComputeESE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
 double criterion(int m, double alpha[])
 {
     int i,j,m1;
-    double h1,h,lambda,sum,*uu,*pp,A,B;
+    double h,lambda,sum,*uu,*pp,A,B;
     
     uu= new double[n];
     pp= new double[n];
@@ -191,7 +191,6 @@ double criterion(int m, double alpha[])
     A=vv[0];
     B=vv[n-1];
     
-    h1=0.5*(B-A)*pow((double)n,-1.0/5);
     h=0.5*(B-A)*pow((double)n,-1.0/7);
     
     //printf("%15.10f\n",h);

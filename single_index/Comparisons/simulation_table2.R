@@ -10,7 +10,7 @@ sourceCpp("ESE.cpp")
 sourceCpp("LSE.cpp")
 
   NumIt = 100
-  n = 100
+  n = 500
   m= 25
   sigma = 1
   a0 = c(rep(1,m))/sqrt(m)
