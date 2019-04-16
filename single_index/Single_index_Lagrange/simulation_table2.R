@@ -16,10 +16,10 @@ sourceCpp("spline.cpp")
   NumIt = 100
   
 # n is the number of observations
-  n = 200
+  n = 500
   
 # m is the dimension of the covariate
-  m= 15
+  m= 25
 
  # sigma is the variance of the error
   sigma = 1

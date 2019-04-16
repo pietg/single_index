@@ -125,7 +125,7 @@ List ComputeLSE(NumericMatrix X, NumericVector y, int NumStart, int m1)
         
         for (i=0;i<m;i++)
             alpha_init[i]=alpha1[i];
-                
+        
         nelmin(criterion,m,alpha_init,alpha,&ynewlo,reqmin,step,konvge,kcount,&icount,&numres,&ifault);
         
         sum=0;
