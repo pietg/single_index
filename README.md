@@ -1,16 +1,10 @@
 # single_index
 
-This repository gives Rcpp scripts for simulations with the profile Least Squares Estimator (LSE), the Simple Score Estimator (SSE), the Effective Score Estimator (ESE), the Penalized Score Estimator (PLSE),
-a linear estimate and Han's Maximum Rank Correlation Estimate, using the methods of section 4.2 and 5 of "Score estimation in the monotone single index model" by Fadoua Balabdaoui, Piet Groeneboom and Kim Hendrickx, https://doi.org/10.1111/sjos.12361, Scandinavian Journal of Statistics and also the manuscript ``The Lagrange approach in the monotone single index model'', http://dutiosb.twi.tudelft.nl/%7Epietg/Single_index_Lagrange.pdf of Piet Groeneboom.
+This repository gives R scripts for simulations with the ordinary profile Least Squares Estimator (LSE), the Simple Score Estimator (SSE), the Effective Score Estimator (ESE) and a spline estimator, using the methods explained in "Profile least squares estimators in the monotone single index model (2020)" https://arxiv.org/abs/2001.05454 of Fadoua Balabdaoui and Piet Groeneboom.
 
-The R script simulation_table2.R (for Table 2 in the paper) in the directory "Comparisons"
-compares the simple score estimator (SSE), the efficient score estimator (ESE) and the least squares estimator (LSE) with the algorithm of the R package EDR and the penalized least squares estimator (PLSE), using smoothing splines.
-
-I could not remove the text that is produced during the runs for the EDR package.
-In the directory ``Comparisons'' the PLSE is computed using the R package "simest", with the slight modification "NewSimEst.R", kindly provided to me by the authors of the package. At the end of the run, the least squares estimate of the link function, corresponding to the ESE algorithm, is shown for the last sample (blue step function), together with the underlying link function (red dashed function) and the points of the sample, plotted in the scale provided by the estimate of the regression parameter alpha.
-
-In the directory ``Single_index_Lagrange'' the PLSE is computed by the Lagrange method, and here the PLSE, computed using the R package "simest", is called PLSE2. This directory is the companion of the manuscript http://dutiosb.twi.tudelft.nl/%7Epietg/Single_index_Lagrange.pdf.
+The R scripts in the directory "Comparisons" compare the ordinary profile least squares estimator (LSE), the simple score estimator (SSE) and the efficient score estimator (ESE) with the algorithm of the R package EDR and a spline estimator. we use our own implementation of the spline estimator, see https://arxiv.org/abs/2001.05454
+We use the augmented Lagrange method, in combination with the Hooke-Jeeves pattern search algorithm, see again https://arxiv.org/abs/2001.05454
 
 For running the scripts, one needs to be able to run the package Rcpp. One also needs to
-copy the other files of the directory, since most of them are used in the script.
+copy the other files of the directory, since most of them are used in the script. We give as examples the R scripts for 1000 replications of sample size 100 for the two models, used in the simulations in "Profile least squares estimators in the monotone single index model (2020)" https://arxiv.org/abs/2001.05454. Simulation1.R is for the first model, with psi(x)=x^3 and the error independent of the covariates, Simulation2.R is for the logistic-binomial model, with an error that depends on the covariates. The values of the simulation are put into the growing files LSE.txt, etc. If one wants to have new files for a new run, one has to remove the previous files of this type. The means and covariances of the runs can be computed by the script table.R.
 

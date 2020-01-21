@@ -1,30 +1,21 @@
 //
-//  simple score estimate in the single index model
+//  ComputeSSE
+//  Simple score estimator for the single index model
 //
-//  Created by Piet Groeneboom on 16/04/18.
-//  Copyright (c) 2018 Piet Groeneboom. All rights reserved.
+//  Created by Piet Groeneboom on 04-05-18.
+//  Copyright (c) 2018 Piet. All rights reserved.
 //
-//  The Hooke-Jeeves algorithm of the TOMS178 library is used:
-//    The ALGOL original is by Arthur Kaupe.
-//    C version by Mark Johnson
-//    C++ version by John Burkardt
 
 #include <stdlib.h>
+#include <math.h>
 #include <iostream>
 #include <iomanip>
-#include <math.h>
-#include <time.h>
-#include <fstream>
-#include <string.h>
-//#include <chrono>
-#include <random>
 #include <Rcpp.h>
+
+#define SQR(x) ((x)*(x))
 
 using namespace std;
 using namespace Rcpp;
-
-int n;
-double **xx,*yy,*vv,*cumw,*cs,*f,*psi;
 
 #define SQR(x) ((x)*(x))
 
@@ -36,27 +27,35 @@ typedef struct
 }
 data_object;
 
+int         n,nIterations;
+double      **xx,*yy,*yy1,*vv,*f,*cumw,*cs;
+double      *psi,*derivative,mu,lambda,cc;
 
-void    swap(double *x,double *y);
+double      delta_tol,eta_tol;
+double      eta0,mu0,omega0;
+double      tau,gamma1,delta1,eta1;
+double      alpha_omega,beta_omega,alpha_eta,beta_eta;
+double      alpha_par,omega,eta,delta;
+
 double  criterion(int m, double alpha[]);
 void    sort_alpha(int m, int n, double **xx, double alpha[], double vv[], double yy[]);
 void    convexmin(int n, double cumw[], double cs[], double y[]);
+int     CompareTime(const void *a, const void *b);
 double  best_nearby (int m, double delta[], double point[], double prevbest,
                      double f(int m, double alpha[]), int *funevals);
-int     hooke(int m, double startpt[], double endpt[], double rho,
-              double eps, int itermax, double f(int m, double alpha[]));
-int     CompareTime(const void *a, const void *b);
+int     hooke(int m, double startpt[], double endpt[], double rho, double eps,
+              int itermax, double f(int m, double alpha[]));
+void    swap(double *x,double *y);
+void    initialize();
 
 
 // [[Rcpp::export]]
 
 List ComputeSSE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
 {
-    int             i,j,m,iter,nIterations;
-    double          *alpha,rho,f2;
-    double          *alpha_init;
-    double          sum,eps;
-
+    int     i,j,m,iter;
+    double  *alpha,*alpha_init;
+    double  eps,rho,sum;
     
     // determine the sample size
     
@@ -66,41 +65,78 @@ List ComputeSSE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
     
     m= (int)m1;
     
-    nIterations=1000;
-    
-    eps=1.0e-5;
     rho=0.5;
+    eps=1.0e-1;
     
-    xx = new double *[n];
-    for (i=0;i<n;i++)
-        xx[i] = new double [m];
-
+    nIterations=100;
+    // copy the data vector for use of the C++ procedures
     
-    yy= new double[n];
-    vv= new double[n];
-    alpha= new double[m];
-    alpha_init= new double[m];
-    f= new double[m];
-    psi  = new double[n];
-    
-    cumw = new double[n+1];
-    cs = new double[n+1];
-    
-    cumw[0]=cs[0]=0;
+    yy = new double[n];
+    yy1 = new double[n+1];
     
     for (i=0;i<n;i++)
         yy[i]=(double)y[i];
     
+    xx = new double *[n];
+    for (i=0;i<n;i++)
+        xx[i] = new double [m];
+    
     for (i=0;i<n;i++)
     {
         for (j=0;j<m;j++)
-            xx[i][j]=(double)X(i,j);
+          xx[i][j]=(double)X(i,j);
     }
+    
+    vv= new double[n];
+    alpha= new double[m];
+    alpha_init= new double[m];
+    f= new double[m];
     
     for (i=0;i<m;i++)
         alpha_init[i]=(double)alpha0(i);
     
-    iter=hooke(m,alpha_init,alpha,rho,eps,nIterations,&criterion);
+    cumw = new double[n+1];
+    cs = new double[n+1];
+    psi  = new double[n];
+    
+    cumw[0]=cs[0]=0;
+    
+    lambda=0;
+    
+    initialize();
+    
+    while (eta>eta_tol || delta>delta_tol)
+    {
+        iter = hooke(m,alpha_init,alpha,rho,delta,nIterations,criterion);
+        
+        sum=0;
+        for (i=0;i<m;i++)
+            sum += SQR(alpha[i]);
+        
+        sum -=1;
+        
+        if (fabs(sum)<eta)
+        {
+            if (eta<=eta_tol && delta<=delta_tol)
+                break;
+            lambda += sum/mu;
+            alpha_par=fmin(mu,gamma1);
+            omega=omega*pow(alpha_par,beta_omega);
+            delta=omega/(1+lambda+1.0/mu);
+            eta=eta*pow(alpha_par,alpha_eta);
+        }
+        else
+        {
+            mu=tau*mu;
+            alpha_par=fmin(mu,gamma1);
+            omega=omega0*pow(alpha_par,alpha_omega);
+            delta=omega/(1+lambda+1.0/mu);
+            eta=eta0*pow(alpha_par,alpha_eta);
+        }
+        
+        for (j=0;j<m;j++)
+            alpha_init[j]=alpha[j];
+    }
     
     sum=0;
     
@@ -109,8 +145,6 @@ List ComputeSSE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
     
     for (i=0;i<m;i++)
         alpha[i]/=sqrt(sum);
-        
-    f2 = criterion(m,alpha);
 
     NumericMatrix out0 = NumericMatrix(n,2);
     
@@ -136,28 +170,126 @@ List ComputeSSE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
         out2(i,1)=psi[i];
     }
     
-    // Number of iterations of Hooke-Jeeves
-
-    int out3 = iter;
+     //Number of iterations of Nelder-Mead
     
+    int out3 = iter;
+
     // make the list for the output, containing alpha and the estimate of psi
     
-    List out = List::create(Rcpp::Named("data")=out0,Rcpp::Named("alpha")=out1,Rcpp::Named("psi")=out2,
-                            Rcpp::Named("niter")=out3);
-    
+    List out = List::create(Rcpp::Named("data")=out0,Rcpp::Named("alpha")=out1,Rcpp::Named("psi")=out2,Rcpp::Named("niter")=out3);
     
     // free memory
+   
+    for (i=0;i<n;i++)
+        delete[] xx[i];
     
-    delete[] yy, delete[] vv, delete[] alpha,
-    delete[] alpha_init, delete[] f, delete[] psi, delete[] cumw, delete[] cs;
-    
-    for (i = 0;i < n;i++) delete[] xx[i];
     delete[] xx;
     
+    delete[] yy; delete[] yy1; delete[] vv; delete[] alpha; delete[] alpha_init; delete[] f;
+    delete[] cumw; delete[] cs; delete[] psi;
+    
     return out;
+}
+
+
+void initialize()
+{
+    tau=gamma1=0.5;
+    eta0=mu0=omega0=1;
+    delta_tol=eta_tol=1.0e-10;
+    alpha_omega=beta_omega=alpha_eta=beta_eta=1;
+    
+    lambda=0;
+    mu=mu0;
+    alpha_par=fmin(mu0,gamma1);
+    omega=omega0*pow(alpha_par,alpha_omega);
+    delta=omega/(1+lambda+1.0/mu);
+    eta=eta0*pow(alpha_par,alpha_eta);
+}
+
+void convexmin(int n, double cumw[], double cs[], double y[])
+{
+  int    i, j, m;
+
+  y[1] = cs[1]/cumw[1];
+  for (i=2;i<=n;i++)
+  {
+    y[i] = (cs[i]-cs[i-1])/(cumw[i]-cumw[i-1]);
+    if (y[i-1]>y[i])
+    {
+      j = i;
+      while (y[j-1] > y[i] && j>1)
+      {
+        j--;
+        if (j>1)
+          y[i] = (cs[i]-cs[j-1])/(cumw[i]-cumw[j-1]);
+        else
+          y[i] = cs[i]/cumw[i];
+        for (m=j;m<i;m++)    y[m] = y[i];
+      }
+    }
+  }
+}
+
+
+double criterion(int m, double alpha[])
+{
+    int i,j;
+    double sum,sum1;
+    
+    sort_alpha(m,n,xx,alpha,vv,yy);
+    
+    yy1[0]=0;
+    
+    for (i=1;i<=n;i++)
+        yy1[i]=yy[i-1];
+    
+    for (i=1;i<=n;i++)
+    {
+        cumw[i]=i*1.0;
+        cs[i]=cs[i-1]+yy1[i];
+    }
+    
+    convexmin(n,cumw,cs,yy1);
+    
+    for (i=0;i<n;i++)
+        psi[i]=yy1[i+1];
+    
+    for (j=0;j<m;j++)
+        f[j]=0;
+    
+    for (j=0;j<m;j++)
+    {
+        for (i=0;i<n;i++)
+            f[j] += xx[i][j]*(psi[i]-yy[i]);
+    }
+    
+    sum1=0;
+    
+    for (i=0;i<m;i++)
+        sum1 += SQR(alpha[i]);
+    
+    sum1 -=1;
+    
+    sum=0;
+    
+    for (i=0;i<m;i++)
+        sum += SQR(f[i]);
+    
+    sum += lambda*sum1+SQR(sum1)/mu;
+    
+    return sum;
     
 }
 
+int CompareTime(const void *a, const void *b)
+{
+    if ((*(data_object *) a).v < (*(data_object *) b).v)
+        return -1;
+    if ((*(data_object *) a).v > (*(data_object *) b).v)
+        return 1;
+    return 0;
+}
 
 void sort_alpha(int m, int n, double **xx, double alpha[], double vv[], double yy[])
 {
@@ -211,95 +343,6 @@ void sort_alpha(int m, int n, double **xx, double alpha[], double vv[], double y
         delete[] xx_new[i];
     delete[] xx_new;
 }
-
-void swap(double *x,double *y)
-{
-    double temp;
-    temp=*x;
-    *x=*y;
-    *y=temp;
-}
-
-double criterion(int m, double alpha[])
-{
-    int i,j;
-    double sum,lambda;
-    
-    /*sum=0;
-    
-    for (i=0;i<m;i++)
-        sum += SQR(alpha[i]);
-    
-    sum = sqrt(sum);
-    
-    for (i=0;i<m;i++)
-        alpha[i] /= sum;*/
-    
-    sort_alpha(m,n,xx,alpha,vv,yy);
-    
-    for (i=1;i<=n;i++)
-    {
-        cumw[i]=i*1.0;
-        cs[i]=cs[i-1]+yy[i-1];
-    }
-    
-    convexmin(n,cumw,cs,psi);
-    
-    for (j=0;j<m;j++)
-        f[j]=0;
-    
-    for (j=0;j<m;j++)
-    {
-        for (i=0;i<n;i++)
-            f[j] += xx[i][j]*(psi[i]-yy[i]);
-    }
-    
-    for (j=0;j<m;j++)
-        f[j]/=n;
-    
-    lambda=0;
-    
-    for (i=0;i<m;i++)
-        lambda += alpha[i]*f[i];
-    
-    for (i=0;i<m;i++)
-        f[i] -= lambda*alpha[i];
-    
-    sum=0;
-    
-    for (i=0;i<m;i++)
-        sum += SQR(f[i]);
-    
-    return sum;
-    
-}
-
-
-
-void convexmin(int n, double cumw[], double cs[], double y[])
-{
-    int	i, j, m;
-    
-    y[0] = cs[1]/cumw[1];
-    for (i=2;i<=n;i++)
-    {
-        y[i-1] = (cs[i]-cs[i-1])/(cumw[i]-cumw[i-1]);
-        if (y[i-2]>y[i-1])
-        {
-            j = i;
-            while (y[j-2] > y[i-1] && j>1)
-            {
-                j--;
-                if (j>1)
-                    y[i-1] = (cs[i]-cs[j-1])/(cumw[i]-cumw[j-1]);
-                else
-                    y[i-1] = cs[i]/cumw[i];
-                for (m=j;m<i;m++)	y[m-1] = y[i-1];
-            }
-        }
-    }
-}
-
 
 double best_nearby (int m, double delta[], double point[], double prevbest,
                     double f(int m, double alpha[]), int *funevals)
@@ -474,14 +517,12 @@ int hooke(int m, double startpt[], double endpt[], double rho, double eps,
 }
 
 
-
-int CompareTime(const void *a, const void *b)
+void swap(double *x,double *y)
 {
-    if ((*(data_object *) a).v < (*(data_object *) b).v)
-        return -1;
-    if ((*(data_object *) a).v > (*(data_object *) b).v)
-        return 1;
-    return 0;
+    double temp;
+    temp=*x;
+    *x=*y;
+    *y=temp;
 }
 
 

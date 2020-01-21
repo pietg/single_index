@@ -1,30 +1,21 @@
 //
-//  efficient score estimate in the single index model
+//  ComputeESE
+//  Simple score estimator for the single index model
 //
-//  Created by Piet Groeneboom on 16/04/18.
-//  Copyright (c) 2018 Piet Groeneboom. All rights reserved.
+//  Created by Piet Groeneboom on 04-05-18.
+//  Copyright (c) 2018 Piet. All rights reserved.
 //
-//  The Hooke-Jeeves algorithm of the TOMS178 library is used:
-//    The ALGOL original is by Arthur Kaupe.
-//    C version by Mark Johnson
-//    C++ version by John Burkardt
 
 #include <stdlib.h>
+#include <math.h>
 #include <iostream>
 #include <iomanip>
-#include <math.h>
-#include <time.h>
-#include <fstream>
-#include <string.h>
-//#include <chrono>
-#include <random>
 #include <Rcpp.h>
+
+#define SQR(x) ((x)*(x))
 
 using namespace std;
 using namespace Rcpp;
-
-int n;
-double **xx,*yy,*vv,*cumw,*cs,*f,*psi,*derivative;
 
 #define SQR(x) ((x)*(x))
 
@@ -36,29 +27,39 @@ typedef struct
 }
 data_object;
 
+int     n,nIterations;
+double  **xx,*yy,*yy1,*vv,*cumw,*cs,*f,*psi;
+double  eps,rho,*derivative,lambda,*alpha_init,mu;
 
-void    swap(double *x,double *y);
+double      delta_tol,eta_tol;
+double      eta0,mu0,omega0;
+double      tau,gamma1;
+double      a_omega,b_omega,a_eta,b_eta;
+double      a,omega,eta,delta;
+
 double  criterion(int m, double alpha[]);
 void    sort_alpha(int m, int n, double **xx, double alpha[], double vv[], double yy[]);
 void    convexmin(int n, double cumw[], double cs[], double y[]);
+int     CompareTime(const void *a, const void *b);
+
 double  best_nearby (int m, double delta[], double point[], double prevbest,
                      double f(int m, double alpha[]), int *funevals);
 int     hooke(int m, double startpt[], double endpt[], double rho, double eps,
               int itermax, double f(int m, double alpha[]));
-int     CompareTime(const void *a, const void *b);
+void    initialize();
 double  KK(double x);
 double  K(double x);
 double  Kprime(double x);
+void    swap(double *x,double *y);
 
 
 // [[Rcpp::export]]
 
 List ComputeESE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
 {
-    int             i,j,m,iter,nIterations;
-    double          *alpha,rho,f2,sum;
-    double          *alpha_init;
-    double          eps;
+    int     i,j,m,iter;
+    double  *alpha,*alpha_init;
+    double  sum;
     
     // determine the sample size
     
@@ -67,52 +68,78 @@ List ComputeESE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
     // m is the dimension
     
     m= (int)m1;
-    
-    nIterations=1000;
-
-    eps=1.0e-5;
+  
+    nIterations=100;
     rho=0.5;
+    eps=1.0e-10;
+    
+    // copy the data vector for use of the C++ procedures
+    
+    yy  = new double[n];
+    yy1 = new double[n+1];
+    
+    for (i=0;i<n;i++)
+        yy[i]=(double)y[i];
     
     xx = new double *[n];
     for (i=0;i<n;i++)
         xx[i] = new double [m];
     
-    yy= new double[n];
+    for (i=0;i<n;i++)
+    {
+        for (j=0;j<m;j++)
+          xx[i][j]=(double)X(i,j);
+    }
+    
     vv= new double[n];
     alpha= new double[m];
     alpha_init= new double[m];
     f= new double[m];
-    psi  = new double[n+1];
-    derivative  = new double[n+1];
-    
-    cumw = new double[n+1];
-    cs = new double[n+1];
-    
-    cumw[0]=cs[0]=0;
-    
-    for (i=0;i<n;i++)
-        yy[i]=(double)y[i];
-    
-    for (i=0;i<n;i++)
-    {
-        for (j=0;j<m;j++)
-            xx[i][j]=(double)X(i,j);
-    }
     
     for (i=0;i<m;i++)
         alpha_init[i]=(double)alpha0(i);
     
-    iter=hooke(m,alpha_init,alpha,rho,eps,nIterations,&criterion);
+    cumw = new double[n+1];
+    cs = new double[n+1];
+    psi  = new double[n];
+    derivative  = new double[n];
     
-    sum=0;
+    cumw[0]=cs[0]=0;
     
-    for (i=0;i<m;i++)
-        sum += SQR(alpha[i]);
+    initialize();
     
-    for (i=0;i<m;i++)
-        alpha[i]/=sqrt(sum);
-    
-    f2 = criterion(m,alpha);
+    while (eta>eta_tol || delta>delta_tol)
+    {
+        iter = hooke(m,alpha_init,alpha,rho,delta,nIterations,criterion);
+        
+        sum=0;
+        for (i=0;i<m;i++)
+            sum += SQR(alpha[i]);
+        
+        sum -=1;
+        
+        if (fabs(sum)<eta)
+        {
+            if (eta<=eta_tol && delta<=delta_tol)
+                break;
+            lambda += sum/mu;
+            a=fmin(mu,gamma1);
+            omega=omega*pow(a,b_omega);
+            delta=omega/(1+lambda+1.0/mu);
+            eta=eta*pow(a,a_eta);
+        }
+        else
+        {
+            mu=tau*mu;
+            a=fmin(mu,gamma1);
+            omega=omega0*pow(a,a_omega);
+            delta=omega/(1+lambda+1.0/mu);
+            eta=eta0*pow(a,a_eta);
+        }
+        
+        for (j=0;j<m;j++)
+            alpha_init[j]=alpha[j];
+    }
     
     NumericMatrix out0 = NumericMatrix(n,2);
     
@@ -121,15 +148,15 @@ List ComputeESE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
         out0(i,0)=vv[i];
         out0(i,1)=yy[i];
     }
-    
-    
+
+
     NumericVector out1 = NumericVector(m);
     
     // computation of alpha
     
     for (i=0;i<m;i++)
         out1(i)=alpha[i];
-    
+        
     NumericMatrix out2 = NumericMatrix(n,2);
     
     for (i=0;i<n;i++)
@@ -145,63 +172,79 @@ List ComputeESE(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
         out3(i,0)=vv[i];
         out3(i,1)=derivative[i];
     }
-
-    // Number of iterations of Hooke-Jeeves
+    
+    
+    // Number of iterations of Nelder-Mead
     
     int out4 = iter;
-    
+
     // make the list for the output, containing alpha and the estimate of psi
     
-    List out = List::create(Rcpp::Named("data")=out0,Rcpp::Named("alpha")=out1,Rcpp::Named("psi")=out2,
-                                        Rcpp::Named("derivative")=out3,Rcpp::Named("niter")=out4);
+     List out = List::create(Rcpp::Named("data")=out0,Rcpp::Named("alpha")=out1,Rcpp::Named("psi")=out2,
+     Rcpp::Named("derivative")=out3,Rcpp::Named("niter")=out4);
     
-    // The last element shows the number of iterations in the Hooke-Jeeves algorithm
+    // The last element shows the number of iterations in the Nelder-Mead algorithm
     
     // free memory
+   
+    for (i=0;i<n;i++)
+        delete[] xx[i];
     
-    delete[] yy, delete[] vv, delete[] alpha,
-    delete[] alpha_init, delete[] f, delete[] psi, delete[] cumw, delete[] cs,
-    delete[] derivative;
-    
-    for (i = 0;i < n;i++) delete[] xx[i];
     delete[] xx;
     
-    return out;
+    delete[] yy, delete[] yy1, delete[] vv; delete[] alpha; delete[] alpha_init; delete[] f;
+    delete[] cumw; delete[] cs; delete[] psi; delete[] derivative;
     
+    return out;
 }
+
+void initialize()
+{
+    tau=gamma1=0.5;
+    eta0=mu0=omega0=1;
+    delta_tol=eta_tol=1.0e-10;
+    a_omega=b_omega=a_eta=b_eta=1;
+    
+    lambda=0;
+    mu=mu0;
+    a=fmin(mu0,gamma1);
+    omega=omega0*pow(a,a_omega);
+    delta=omega/(1+lambda+1.0/mu);
+    eta=eta0*pow(a,a_eta);
+}
+
+
 
 double criterion(int m, double alpha[])
 {
     int i,j,m1;
-    double h,lambda,sum,*uu,*pp,A,B;
+    double h,sum,sum1,*uu,*pp,A,B;
     
     uu= new double[n];
     pp= new double[n];
-    
-    /*sum=0;
-    
-    for (i=0;i<m;i++)
-        sum += SQR(alpha[i]);
-    
-    for (i=0;i<m;i++)
-        alpha[i]/=sqrt(sum);*/
     
     sort_alpha(m,n,xx,alpha,vv,yy);
     
     A=vv[0];
     B=vv[n-1];
-    
+      
     h=0.5*(B-A)*pow((double)n,-1.0/7);
     
-    //printf("%15.10f\n",h);
+    yy1[0]=0;
+    
+    for (i=1;i<=n;i++)
+        yy1[i]=yy[i-1];
     
     for (i=1;i<=n;i++)
     {
         cumw[i]=i*1.0;
-        cs[i]=cs[i-1]+yy[i-1];
+        cs[i]=cs[i-1]+yy1[i];
     }
     
-    convexmin(n,cumw,cs,psi);
+    convexmin(n,cumw,cs,yy1);
+    
+    for (i=0;i<n;i++)
+        psi[i]=yy1[i+1];
     
     j=-1;
     
@@ -263,50 +306,50 @@ double criterion(int m, double alpha[])
     for (j=0;j<m;j++)
         f[j]/=n;
     
-    lambda=0;
+    sum1=0;
     
     for (i=0;i<m;i++)
-        lambda += alpha[i]*f[i];
+        sum1 += SQR(alpha[i]);
     
-    for (i=0;i<m;i++)
-        f[i] -= lambda*alpha[i];
+    sum1 -=1;
     
     sum=0;
     
     for (i=0;i<m;i++)
         sum += SQR(f[i]);
     
+    sum += lambda*sum1+SQR(sum1)/mu;
+    
     delete[] uu; delete[] pp;
     
     return sum;
-    
 }
+
 
 
 void convexmin(int n, double cumw[], double cs[], double y[])
 {
-    int	i, j, m;
-    
-    y[0] = cs[1]/cumw[1];
-    for (i=2;i<=n;i++)
-    {
-        y[i-1] = (cs[i]-cs[i-1])/(cumw[i]-cumw[i-1]);
-        if (y[i-2]>y[i-1])
-        {
-            j = i;
-            while (y[j-2] > y[i-1] && j>1)
-            {
-                j--;
-                if (j>1)
-                    y[i-1] = (cs[i]-cs[j-1])/(cumw[i]-cumw[j-1]);
-                else
-                    y[i-1] = cs[i]/cumw[i];
-                for (m=j;m<i;m++)	y[m-1] = y[i-1];
-            }
-        }
-    }
-}
+  int    i, j, m;
 
+  y[1] = cs[1]/cumw[1];
+  for (i=2;i<=n;i++)
+  {
+    y[i] = (cs[i]-cs[i-1])/(cumw[i]-cumw[i-1]);
+    if (y[i-1]>y[i])
+    {
+      j = i;
+      while (y[j-1] > y[i] && j>1)
+      {
+        j--;
+        if (j>1)
+          y[i] = (cs[i]-cs[j-1])/(cumw[i]-cumw[j-1]);
+        else
+          y[i] = cs[i]/cumw[i];
+        for (m=j;m<i;m++)    y[m] = y[i];
+      }
+    }
+  }
+}
 
 
 double KK(double x)
@@ -358,7 +401,6 @@ double Kprime(double x)
     return y;
 }
 
-
 int CompareTime(const void *a, const void *b)
 {
     if ((*(data_object *) a).v < (*(data_object *) b).v)
@@ -366,181 +408,6 @@ int CompareTime(const void *a, const void *b)
     if ((*(data_object *) a).v > (*(data_object *) b).v)
         return 1;
     return 0;
-}
-
-double best_nearby (int m, double delta[], double point[], double prevbest,
-                    double f(int m, double alpha[]), int *funevals)
-{
-    double ftmp,minf,*z;
-    int i;
-    
-    z = new double[m];
-    
-    minf = prevbest;
-    
-    for ( i = 0; i < m; i++ )
-        z[i] = point[i];
-    
-    for ( i = 0; i < m; i++ )
-    {
-        z[i] = point[i] + delta[i];
-        
-        ftmp = f(m,z);
-        *funevals = *funevals + 1;
-        
-        if ( ftmp < minf )
-            minf = ftmp;
-        else
-        {
-            delta[i] = - delta[i];
-            z[i] = point[i] + delta[i];
-            ftmp = f(m,z);
-            *funevals = *funevals + 1;
-            
-            if ( ftmp < minf )
-                minf = ftmp;
-            else
-                z[i] = point[i];
-        }
-    }
-    
-    for ( i = 0; i < m; i++ )
-        point[i] = z[i];
-    
-    delete [] z;
-    
-    return minf;
-}
-
-
-int hooke(int m, double startpt[], double endpt[], double rho, double eps,
-          int itermax, double f(int m, double alpha[]))
-{
-    double *delta,fbefore;
-    int i,iters,keep,funevals,count;
-    double newf,*newx,steplength,tmp;
-    bool verbose = false;
-    double *xbefore;
-    
-    delta = new double[m];
-    newx = new double[m];
-    xbefore = new double[m];
-    
-    for ( i = 0; i < m; i++ )
-        xbefore[i] = newx[i] = startpt[i];
-    
-    for ( i = 0; i < m; i++ )
-    {
-        if ( startpt[i] == 0.0 )
-            delta[i] = rho;
-        else
-            delta[i] = rho*fabs(startpt[i]);
-    }
-    
-    // printf("\n %16.10f %15.10f %15.10f\n \n", newx[0],newx[1],newx[2]);
-    
-    funevals = 0;
-    steplength = rho;
-    iters = 0;
-    
-    
-    fbefore = f(m,newx);
-    funevals = funevals + 1;
-    newf = fbefore;
-    
-    while ( iters < itermax && eps < steplength )
-    {
-        iters = iters + 1;
-        
-        if (verbose)
-        {
-            cout << "\n";
-            cout << "  FUNEVALS, = " << funevals
-            << "  F(X) = " << fbefore << "\n";
-            
-            for ( i = 0; i < m; i++ )
-            {
-                cout << "  " << i + 1
-                << "  " << xbefore[i] << "\n";
-            }
-        }
-        //
-        //  Find best new alpha, one coordinate at a time.
-        //
-        for ( i = 0; i < m; i++ )
-            newx[i] = xbefore[i];
-        
-        
-        
-        newf = best_nearby(m,delta,newx,fbefore,f,&funevals);
-        //
-        //  If we made some improvements, pursue that direction.
-        //
-        keep = 1;
-        count=0;
-        
-        while (newf<fbefore && keep == 1 && count<=100)
-        {
-            count++;
-            for ( i = 0; i < m; i++ )
-            {
-                //
-                //  Arrange the sign of DELTA.
-                //
-                if ( newx[i] <= xbefore[i] )
-                    delta[i] = - fabs(delta[i]);
-                else
-                    delta[i] = fabs(delta[i]);
-                //
-                //  Now, move further in this direction.
-                //
-                tmp = xbefore[i];
-                xbefore[i] = newx[i];
-                newx[i] = newx[i] + newx[i] - tmp;
-            }
-            
-            fbefore = newf;
-            
-            newf = best_nearby(m,delta,newx,fbefore,f,&funevals);
-            //
-            //  If the further (optimistic) move was bad...
-            //
-            if (fbefore <= newf)
-                break;
-            //
-            //  Make sure that the differences between the new and the old points
-            //  are due to actual displacements; beware of roundoff errors that
-            //  might cause NEWF < FBEFORE.
-            //
-            keep = 0;
-            
-            for ( i = 0; i < m; i++ )
-            {
-                if ( 0.5 * fabs(delta[i]) < fabs(newx[i]-xbefore[i]))
-                {
-                    keep = 1;
-                    break;
-                }
-            }
-        }
-        
-        if (eps <= steplength && fbefore <= newf)
-        {
-            steplength = steplength * rho;
-            for ( i = 0; i < m; i++ )
-                delta[i] = delta[i] * rho;
-        }
-        
-    }
-    
-    for ( i = 0; i < m; i++ )
-        endpt[i] = xbefore[i];
-    
-    delete [] delta;
-    delete [] newx;
-    delete [] xbefore;
-    
-    return iters;
 }
 
 void sort_alpha(int m, int n, double **xx, double alpha[], double vv[], double yy[])
@@ -595,6 +462,182 @@ void sort_alpha(int m, int n, double **xx, double alpha[], double vv[], double y
         delete[] xx_new[i];
     delete[] xx_new;
 }
+
+
+
+
+double best_nearby (int m, double delta1[], double point[], double prevbest,
+                    double f(int m, double alpha[]), int *funevals)
+{
+    double ftmp,minf,*z;
+    int i;
+    
+    z = new double[m];
+    
+    minf = prevbest;
+    
+    for ( i = 0; i < m; i++ )
+        z[i] = point[i];
+    
+    for ( i = 0; i < m; i++ )
+    {
+        z[i] = point[i] + delta1[i];
+        
+        ftmp = f(m,z);
+        *funevals = *funevals + 1;
+        
+        if ( ftmp < minf )
+            minf = ftmp;
+        else
+        {
+            delta1[i] = - delta1[i];
+            z[i] = point[i] + delta1[i];
+            ftmp = f(m,z);
+            *funevals = *funevals + 1;
+            
+            if ( ftmp < minf )
+                minf = ftmp;
+            else
+                z[i] = point[i];
+        }
+    }
+    
+    for ( i = 0; i < m; i++ )
+        point[i] = z[i];
+    
+    delete [] z;
+    
+    return minf;
+}
+
+int hooke(int m, double startpt[], double endpt[], double rho, double eps,
+          int itermax, double f(int m, double alpha[]))
+{
+    double *delta1,fbefore;
+    int i,iters,keep,funevals,count;
+    double newf,*newx,steplength,tmp;
+    bool verbose = false;
+    double *xbefore;
+    
+    delta1 = new double[m];
+    newx = new double[m];
+    xbefore = new double[m];
+    
+    for ( i = 0; i < m; i++ )
+        xbefore[i] = newx[i] = startpt[i];
+    
+    for ( i = 0; i < m; i++ )
+    {
+        if ( startpt[i] == 0.0 )
+            delta1[i] = rho;
+        else
+            delta1[i] = rho*fabs(startpt[i]);
+    }
+    
+    funevals = 0;
+    steplength = rho;
+    iters = 0;
+    
+    
+    fbefore = f(m,newx);
+    funevals = funevals + 1;
+    newf = fbefore;
+    
+    while ( iters < itermax && eps < steplength )
+    {
+        iters = iters + 1;
+        
+        if (verbose)
+        {
+            cout << "\n";
+            cout << "  FUNEVALS, = " << funevals
+            << "  F(X) = " << fbefore << "\n";
+            
+            for ( i = 0; i < m; i++ )
+            {
+                cout << "  " << i + 1
+                << "  " << xbefore[i] << "\n";
+            }
+        }
+        //
+        //  Find best new alpha, one coordinate at a time.
+        //
+        for ( i = 0; i < m; i++ )
+            newx[i] = xbefore[i];
+        
+        
+        
+        newf = best_nearby(m,delta1,newx,fbefore,f,&funevals);
+        //
+        //  If we made some improvements, pursue that direction.
+        //
+        keep = 1;
+        count=0;
+        
+        while (newf<fbefore && keep == 1 && count<=100)
+        {
+            count++;
+            for ( i = 0; i < m; i++ )
+            {
+                //
+                //  Arrange the sign of DELTA.
+                //
+                if ( newx[i] <= xbefore[i] )
+                    delta1[i] = - fabs(delta1[i]);
+                else
+                    delta1[i] = fabs(delta1[i]);
+                //
+                //  Now, move further in this direction.
+                //
+                tmp = xbefore[i];
+                xbefore[i] = newx[i];
+                newx[i] = newx[i] + newx[i] - tmp;
+            }
+            
+            fbefore = newf;
+            
+            newf = best_nearby(m,delta1,newx,fbefore,f,&funevals);
+            //
+            //  If the further (optimistic) move was bad...
+            //
+            if (fbefore <= newf)
+                break;
+            //
+            //  Make sure that the differences between the new and the old points
+            //  are due to actual displacements; beware of roundoff errors that
+            //  might cause NEWF < FBEFORE.
+            //
+            keep = 0;
+            
+            for ( i = 0; i < m; i++ )
+            {
+                if ( 0.5 * fabs(delta1[i]) < fabs(newx[i]-xbefore[i]))
+                {
+                    keep = 1;
+                    break;
+                }
+            }
+        }
+        
+        if (eps <= steplength && fbefore <= newf)
+        {
+            steplength = steplength * rho;
+            for ( i = 0; i < m; i++ )
+                delta1[i] = delta1[i] * rho;
+        }
+        
+    }
+    
+    for ( i = 0; i < m; i++ )
+        endpt[i] = xbefore[i];
+    
+    delete [] delta1;
+    delete [] newx;
+    delete [] xbefore;
+    
+    return iters;
+}
+
 
 void swap(double *x,double *y)
 {
