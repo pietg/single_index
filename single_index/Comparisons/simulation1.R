@@ -26,7 +26,7 @@ for (j in 1: NumIt){
   
   print(j)
 
-  a0 = c(1/sqrt(2),1/sqrt(2))
+  a0 = c(1,0)
 	
 	X = matrix(runif(m*n,0,1),n,m, byrow = FALSE)
 	#X = matrix(rnorm(m*n,0,sigma),n,m, byrow = FALSE)
@@ -42,7 +42,7 @@ for (j in 1: NumIt){
 	# LSE
 	starter_lse = proc.time()
 	#LSE <- ComputeLSE(X,y,c(rep(sqrt(1/2),m)),m)
-	LSE <- ComputeLSE(X,y,c(1,0),m)
+	LSE <- ComputeLSE(X,y,a0,m)
 	lse_hat = LSE$alpha
 	time_lse = (proc.time() -starter_lse)[3]
 	

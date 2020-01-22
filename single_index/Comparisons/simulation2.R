@@ -42,8 +42,7 @@ for (j in 1: NumIt){
 	
 	# LSE
 	starter_lse = proc.time()
-	#LSE <- ComputeLSE(X,y,c(rep(sqrt(1/2),m)),m)
-	LSE <- ComputeLSE(X,y,c(1,0),m)
+	LSE <- ComputeLSE(X,y,a0,m)
 	lse_hat = LSE$alpha
 	time_lse = (proc.time() -starter_lse)[3]
 	
