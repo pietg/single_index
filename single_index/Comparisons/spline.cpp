@@ -27,19 +27,12 @@ typedef struct
 }
 data_object;
 
-int n,m,nIterations;
-double **xx,*yy,*vv,*f,*psi,mu,mu1;
-double **q,*d,*D,**L,**b,**b_inv,*derivative;
-double lambda;
-
-double      delta_tol,eta_tol;
-double      eta0,mu0,omega0;
-double      tau,gamma1,delta1,eta1;
-double      alpha_omega,beta_omega,alpha_eta,beta_eta;
-double      alpha_par,omega,eta,delta;
+int m,n;
+double **xx,*yy,*vv,*f,*psi,mu,mu1,**rr,penalty;
+double **q,*d,*D,**L,**b,**b_inv,*derivative,*alpha,beta1;
 
 
-double  criterion(int m, double alpha[]);
+double  criterion(double beta);
 void    sort_alpha(int m, int n, double **xx, double alpha[], double vv[], double yy[]);
 int     CompareTime(const void *a, const void *b);
 void    swap(double *x,double *y);
@@ -47,19 +40,18 @@ void    Compute_Q(int n, double q[], double b[]);
 void    Compute_cubic_spline();
 void    Cholesky_sol(int n, double b[], double z[], double x[]);
 void    Cholesky_dec(int n, double b[], double D[], double **L);
-double  best_nearby (int m, double delta[], double point[], double prevbest,
-                     double f(int m, double alpha[]), int *funevals);
-int     hooke(int m, double startpt[], double endpt[], double rho, double eps,
-              int itermax, double f(int m, double alpha[]));
-void    initialize();
+double  golden(double a1, double b1, double (*f)(double));
+double  Compute_penalty(double gamma[]);
+void    Compute_R();
 
 // [[Rcpp::export]]
 
-List Compute_spline(NumericMatrix X, NumericVector y, NumericVector alpha0, int m1)
+List Compute_spline(NumericMatrix X, NumericVector y, int m1)
 {
-    int             m,i,j,iter;
-    double          *alpha,*alpha_init;
-    double          eps,rho,sum;
+    int  i,j;
+    double pi;
+    
+    pi=4*atan(1);
        
     // determine the sample size
     
@@ -68,11 +60,6 @@ List Compute_spline(NumericMatrix X, NumericVector y, NumericVector alpha0, int 
     // m is the dimension
     m= (int)m1;
     mu=0.1;
-    
-    rho=0.5;
-    eps=1.0e-1;
-    
-    nIterations=100;
     
     // copy the data vector for use of the C++ procedures
     
@@ -93,51 +80,19 @@ List Compute_spline(NumericMatrix X, NumericVector y, NumericVector alpha0, int 
     
     vv= new double[n];
     alpha= new double[m];
-    alpha_init= new double[m];
     f= new double[m];
-    
-    for (i=0;i<m;i++)
-        alpha_init[i]=(double)alpha0(i);
     
     psi  = new double[n];
     derivative  = new double[n];
     
-    lambda=0;
-    
-    initialize();
-    
-    while (eta>eta_tol || delta>delta_tol)
-    {
-        iter = hooke(m,alpha_init,alpha,rho,delta,nIterations,criterion);
-        
-        sum=0;
-        for (i=0;i<m;i++)
-            sum += SQR(alpha[i]);
-        
-        sum -=1;
-        
-        if (fabs(sum)<eta)
-        {
-            if (eta<=eta_tol && delta<=delta_tol)
-                break;
-            lambda += sum/mu1;
-            alpha_par=fmin(mu1,gamma1);
-            omega=omega*pow(alpha_par,beta_omega);
-            delta=omega/(1+lambda+1.0/mu1);
-            eta=eta*pow(alpha_par,alpha_eta);
-        }
-        else
-        {
-            mu1=tau*mu1;
-            alpha_par=fmin(mu1,gamma1);
-            omega=omega0*pow(alpha_par,alpha_omega);
-            delta=omega/(1+lambda+1.0/mu1);
-            eta=eta0*pow(alpha_par,alpha_eta);
-        }
-        
-        for (j=0;j<m;j++)
-            alpha_init[j]=alpha[j];
-    }
+    rr = new double *[n];
+    for (i=0;i<n;i++)
+          rr[i] = new double [2];
+      
+    beta1 = golden(0,pi/2,criterion);
+     
+    alpha[0]=cos(beta1);
+    alpha[1]=sin(beta1);
     
     NumericMatrix out0 = NumericMatrix(n,2);
     
@@ -169,15 +124,11 @@ List Compute_spline(NumericMatrix X, NumericVector y, NumericVector alpha0, int 
         out3(i,0)=vv[i];
         out3(i,1)=derivative[i];
     }
-    
-    // Number of iterations of Nelder-Mead
-    
-    int out4 = iter;
-        
         
     // make the list for the output, containing alpha and the estimate of psi
         
-    List out = List::create(Rcpp::Named("data")=out0,Rcpp::Named("alpha")=out1,Rcpp::Named("psi")=out2,Rcpp::Named("derivative")=out3,Rcpp::Named("niter")=out4);
+    List out = List::create(Rcpp::Named("data")=out0,Rcpp::Named("alpha")=out1,Rcpp::Named("psi")=out2,
+                                        Rcpp::Named("derivative")=out3);
     // free memory
    
     for (i=0;i<n;i++)
@@ -185,56 +136,99 @@ List Compute_spline(NumericMatrix X, NumericVector y, NumericVector alpha0, int 
     
     delete[] xx;
     
-    delete[] yy; delete[] vv; delete[] alpha; delete[] alpha_init; delete[] f; delete[] psi;
+    for (i=0;i<n;i++)
+           delete[] rr[i];
+       
+    delete[] rr;
+    
+    delete[] yy; delete[] vv; delete[] alpha; delete[] f; delete[] psi;
     delete[] derivative;
     
     return out;
 }
 
-void initialize()
-{
-    tau=gamma1=0.5;
-    eta0=mu0=omega0=1;
-    delta_tol=eta_tol=1.0e-10;
-    alpha_omega=beta_omega=alpha_eta=beta_eta=1;
-    
-    lambda=0;
-    mu1=mu0;
-    alpha_par=fmin(mu0,gamma1);
-    omega=omega0*pow(alpha_par,alpha_omega);
-    delta=omega/(1+lambda+1.0/mu1);
-    eta=eta0*pow(alpha_par,alpha_eta);
-}
-
-
 // This is the criterion with the derivative of the spline
 
-double criterion(int m, double alpha[])
+double criterion(double beta)
 {
-    int i,j;
-    double sum,sum1;
+    int i;
+    double sum;
+    
+    alpha[0]=cos(beta);
+    alpha[1]=sin(beta);
     
     sort_alpha(m,n,xx,alpha,vv,yy);
     
     Compute_cubic_spline();
     
-    sum1=0;
-    
-    for (i=0;i<m;i++)
-        sum1 += SQR(alpha[i]);
-    
-    sum1 -=1;
-    
     sum=0;
-
-    for (j=0;j<n;j++)
-        sum += SQR(psi[j]-yy[j])/n;
     
-    sum += lambda*sum1+0.5*SQR(sum1)/mu1;
+    for (i=0;i<n;i++)
+        sum += SQR(psi[i]-yy[i])/n;
     
-    return sum;
+    return sum+mu*penalty;
 }
 
+void Compute_R()
+{
+    int i;
+    
+    for (i=1;i<=n-2;i++)
+    {
+        rr[i][0]=(vv[i+1]-vv[i-1])/3;
+        if (i<n-2)
+            rr[i][1]=(vv[i+1]-vv[i])/6;
+    }
+}
+
+double Compute_penalty(double gamma[])
+{
+    int i;
+    double sum;
+    
+    Compute_R();
+    
+    sum=0;
+    for (i=1;i<=n-2;i++)
+    {
+        sum += rr[i][0]*SQR(gamma[i]);
+        if (i<n-2)
+            sum += 2*rr[i][1]*gamma[i]*gamma[i+1];
+    }
+    
+    return sum/n;
+}
+
+
+double golden(double a1, double b1, double (*f)(double))
+{
+  double a,b,eps=1.0e-10;
+  
+  a=a1;
+  b=b1;
+  
+  double k = (sqrt(5.0) - 1.0) / 2;
+  double xL = b - k*(b - a);
+  double xR = a + k*(b - a);
+  
+  while (b-a>eps)
+  {
+    if ((*f)(xL)<(*f)(xR))
+    {
+      b = xR;
+      xR = xL;
+      xL = b - k*(b - a);
+    }
+    else
+    {
+      a = xL;
+      xL = xR;
+      xR = a + k * (b - a);
+    }
+  }
+  return (a+b)/2;
+  
+}
 
 
 
@@ -343,6 +337,8 @@ void Compute_cubic_spline()
         c[i-1]=(yy[i]-yy[i-1])/(vv[i]-vv[i-1])-(yy[i-1]-yy[i-2])/(vv[i-1]-vv[i-2]);
     
     Cholesky_sol(n-2,a,c,gamma);
+    
+    penalty = Compute_penalty(gamma);
     
     d[1] += q[1]*gamma[1];
     

@@ -22,3 +22,13 @@ n*cov(B)
 B<-read.table("spline.txt")
 colMeans(B)
 n*cov(B)
+
+B<-read.table("MAVE.txt")
+colMeans(B)
+n*cov(B)
+
+B<-read.table("EFM.txt")
+colMeans(B)
+n*cov(B)
+
+
