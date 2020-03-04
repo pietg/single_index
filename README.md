@@ -8,6 +8,6 @@ This repository gives R scripts for simulations with the ordinary profile Least 
 
 The methods are discussed in "Profile least squares estimators in the monotone single index model (2020)" https://arxiv.org/abs/2001.05454 of Fadoua Balabdaoui and Piet Groeneboom.
 
-The R script simulation_table1.R in the directory "Comparisons" runs simulations for the first model, discussed in "Profile least squares estimators in the monotone single index model (2020)" and the R script simulation_table2.R runs simulations for the second model. One can adjust the sample size n and the number of replication NumIt in these R files.
+The R script simulation_table1.R in the directory "Comparisons" runs simulations for the first model, discussed in "Profile least squares estimators in the monotone single index model (2020)" and the R script simulation_table2.R runs simulations for the second model. One can adjust the sample size n and the number of replications NumIt in these R files.
 For running the scripts, one needs to be able to run the R package Rcpp. The values of the simulations are put into the growing files LSE.txt, etc. If one wants to have new files for a new run, one has to remove the previous files of this type. The means and covariances of the runs can be computed by the script variances.R.
 
