@@ -47,25 +47,25 @@ for (j in 1: NumIt){
 	
 	# LSE
 	starter_lse = proc.time()
-	LSE <- ComputeLSE(X,y,m)
+	LSE <- ComputeLSE(X,y)
 	lse_hat = LSE$alpha
 	time_lse = (proc.time() -starter_lse)[3]
 	
 	# SSE
 	starter_sse = proc.time()
-	SSE <- ComputeSSE(X,y,m)
+	SSE <- ComputeSSE(X,y)
 	sse_hat = SSE$alpha
 	time_sse = (proc.time() -starter_sse)[3]
 	
 	# ESE
 	starter_ese = proc.time()
-	ESE <- ComputeESE(X,y,m)
+	ESE <- ComputeESE(X,y)
 	ese_hat = ESE$alpha
 	time_ese = (proc.time() -starter_ese)[3]
 		
 	# spline
 	starter_spline = proc.time()	
-	spline <-Compute_spline(X,y,m)
+	spline <-Compute_spline(X,y)
 	spline_hat = spline$alpha
 	time_spline = (proc.time() -starter_spline)[3]
 
