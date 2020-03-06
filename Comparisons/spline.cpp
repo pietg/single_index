@@ -29,7 +29,7 @@ data_object;
 
 int m,n;
 double **xx,*yy,*vv,*f,*psi,mu,mu1,**rr,penalty;
-double **q,*d,*D,**L,**b,**b_inv,*derivative,*alpha,beta1;
+double **q,*d,*D,**L,**b,**b_inv,*alpha,beta1;
 
 
 double  criterion(double beta);
@@ -46,7 +46,7 @@ void    Compute_R();
 
 // [[Rcpp::export]]
 
-List Compute_spline(NumericMatrix X, NumericVector y, int m1)
+List Compute_spline(NumericMatrix X, NumericVector y)
 {
     int  i,j;
     double pi;
@@ -58,7 +58,7 @@ List Compute_spline(NumericMatrix X, NumericVector y, int m1)
     n = (int)(y.size());
     
     // m is the dimension
-    m= (int)m1;
+    m= 2;
     mu=0.1;
     
     // copy the data vector for use of the C++ procedures
@@ -83,12 +83,12 @@ List Compute_spline(NumericMatrix X, NumericVector y, int m1)
     f= new double[m];
     
     psi  = new double[n];
-    derivative  = new double[n];
     
     rr = new double *[n];
     for (i=0;i<n;i++)
           rr[i] = new double [2];
       
+    
     beta1 = golden(0,pi/2,criterion);
      
     alpha[0]=cos(beta1);
@@ -109,26 +109,10 @@ List Compute_spline(NumericMatrix X, NumericVector y, int m1)
     for (i=0;i<m;i++)
         out1(i)=alpha[i];
     
-    NumericMatrix out2 = NumericMatrix(n,2);
-    
-    for (i=0;i<n;i++)
-    {
-        out2(i,0)=vv[i];
-        out2(i,1)=psi[i];
-    }
-    
-    NumericMatrix out3 = NumericMatrix(n,2);
-    
-    for (i=0;i<n;i++)
-    {
-        out3(i,0)=vv[i];
-        out3(i,1)=derivative[i];
-    }
+    // make the list for the output, containing alpha and the observation points
         
-    // make the list for the output, containing alpha and the estimate of psi
-        
-    List out = List::create(Rcpp::Named("data")=out0,Rcpp::Named("alpha")=out1,Rcpp::Named("psi")=out2,
-                                        Rcpp::Named("derivative")=out3);
+    List out = List::create(Rcpp::Named("data")=out0,Rcpp::Named("alpha")=out1);
+    
     // free memory
    
     for (i=0;i<n;i++)
@@ -142,12 +126,9 @@ List Compute_spline(NumericMatrix X, NumericVector y, int m1)
     delete[] rr;
     
     delete[] yy; delete[] vv; delete[] alpha; delete[] f; delete[] psi;
-    delete[] derivative;
     
     return out;
 }
-
-// This is the criterion with the derivative of the spline
 
 double criterion(double beta)
 {
@@ -158,6 +139,8 @@ double criterion(double beta)
     alpha[1]=sin(beta);
     
     sort_alpha(m,n,xx,alpha,vv,yy);
+    
+    //mu=SQR((vv[n-1]-vv[0])*pow(n,-0.25))/log(n);
     
     Compute_cubic_spline();
     
@@ -358,12 +341,6 @@ void Compute_cubic_spline()
     for (i=0;i<n;i++)
         psi[i]=yy[i]-mu*d[i+1];
     
-    derivative[0]=(psi[1]-psi[0])/(vv[1]-vv[0])-(1.0/6)*(vv[1]-vv[0])*gamma[1];
-    derivative[n-1]=(psi[n-1]-psi[n-2])/(vv[n-1]-vv[n-2])+(1.0/6)*(vv[n-1]-vv[n-2])*gamma[n-2];
-    
-    for (j=1;j<=n-2;j++)
-        derivative[j]=(psi[j]-psi[j-1])/(vv[j]-vv[j-1])+(1.0/6)*(vv[j]-vv[j-1])*(gamma[j-1]+2*gamma[j]);
-    
     delete[] a; delete[] b; delete[] c; delete[] d;
     delete[] q; delete[] gamma;
     
@@ -472,178 +449,6 @@ void Cholesky_sol(int n, double b[], double z[], double x[])
     
     delete[] L;
     
-}
-
-double best_nearby (int m, double delta[], double point[], double prevbest,
-                    double f(int m, double alpha[]), int *funevals)
-{
-    double ftmp,minf,*z;
-    int i;
-    
-    z = new double[m];
-    
-    minf = prevbest;
-    
-    for ( i = 0; i < m; i++ )
-        z[i] = point[i];
-    
-    for ( i = 0; i < m; i++ )
-    {
-        z[i] = point[i] + delta[i];
-        
-        ftmp = f(m,z);
-        *funevals = *funevals + 1;
-        
-        if ( ftmp < minf )
-            minf = ftmp;
-        else
-        {
-            delta[i] = - delta[i];
-            z[i] = point[i] + delta[i];
-            ftmp = f(m,z);
-            *funevals = *funevals + 1;
-            
-            if ( ftmp < minf )
-                minf = ftmp;
-            else
-                z[i] = point[i];
-        }
-    }
-    
-    for ( i = 0; i < m; i++ )
-        point[i] = z[i];
-    
-    delete [] z;
-    
-    return minf;
-}
-
-int hooke(int m, double startpt[], double endpt[], double rho, double eps,
-          int itermax, double f(int m, double alpha[]))
-{
-    double *delta,fbefore;
-    int i,iters,keep,funevals,count;
-    double newf,*newx,steplength,tmp;
-    bool verbose = false;
-    double *xbefore;
-    
-    delta = new double[m];
-    newx = new double[m];
-    xbefore = new double[m];
-    
-    for ( i = 0; i < m; i++ )
-        xbefore[i] = newx[i] = startpt[i];
-    
-    for ( i = 0; i < m; i++ )
-    {
-        if ( startpt[i] == 0.0 )
-            delta[i] = rho;
-        else
-            delta[i] = rho*fabs(startpt[i]);
-    }
-    
-    funevals = 0;
-    steplength = rho;
-    iters = 0;
-    
-    
-    fbefore = f(m,newx);
-    funevals = funevals + 1;
-    newf = fbefore;
-    
-    while ( iters < itermax && eps < steplength )
-    {
-        iters = iters + 1;
-        
-        if (verbose)
-        {
-            cout << "\n";
-            cout << "  FUNEVALS, = " << funevals
-            << "  F(X) = " << fbefore << "\n";
-            
-            for ( i = 0; i < m; i++ )
-            {
-                cout << "  " << i + 1
-                << "  " << xbefore[i] << "\n";
-            }
-        }
-        //
-        //  Find best new alpha, one coordinate at a time.
-        //
-        for ( i = 0; i < m; i++ )
-            newx[i] = xbefore[i];
-        
-        
-        
-        newf = best_nearby(m,delta,newx,fbefore,f,&funevals);
-        //
-        //  If we made some improvements, pursue that direction.
-        //
-        keep = 1;
-        count=0;
-        
-        while (newf<fbefore && keep == 1 && count<=100)
-        {
-            count++;
-            for ( i = 0; i < m; i++ )
-            {
-                //
-                //  Arrange the sign of DELTA.
-                //
-                if ( newx[i] <= xbefore[i] )
-                    delta[i] = - fabs(delta[i]);
-                else
-                    delta[i] = fabs(delta[i]);
-                //
-                //  Now, move further in this direction.
-                //
-                tmp = xbefore[i];
-                xbefore[i] = newx[i];
-                newx[i] = newx[i] + newx[i] - tmp;
-            }
-            
-            fbefore = newf;
-            
-            newf = best_nearby(m,delta,newx,fbefore,f,&funevals);
-            //
-            //  If the further (optimistic) move was bad...
-            //
-            if (fbefore <= newf)
-                break;
-            //
-            //  Make sure that the differences between the new and the old points
-            //  are due to actual displacements; beware of roundoff errors that
-            //  might cause NEWF < FBEFORE.
-            //
-            keep = 0;
-            
-            for ( i = 0; i < m; i++ )
-            {
-                if ( 0.5 * fabs(delta[i]) < fabs(newx[i]-xbefore[i]))
-                {
-                    keep = 1;
-                    break;
-                }
-            }
-        }
-        
-        if (eps <= steplength && fbefore <= newf)
-        {
-            steplength = steplength * rho;
-            for ( i = 0; i < m; i++ )
-                delta[i] = delta[i] * rho;
-        }
-        
-    }
-    
-    for ( i = 0; i < m; i++ )
-        endpt[i] = xbefore[i];
-    
-    delete [] delta;
-    delete [] newx;
-    delete [] xbefore;
-    
-    return iters;
 }
 
 void swap(double *x,double *y)

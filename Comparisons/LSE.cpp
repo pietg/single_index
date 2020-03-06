@@ -1,8 +1,8 @@
 //
-//  ComputeSSE
-//  Simple score estimator for the single index model
+//  ComputeLSE
+//  Profile LS estimator for the single index model
 //
-//  Created by Piet Groeneboom on 04-05-18.
+//  Created by Piet Groeneboom on 02-02-20.
 //  Copyright (c) 2018 Piet. All rights reserved.
 //
 
@@ -27,11 +27,9 @@ typedef struct
 }
 data_object;
 
-
 int         m,n,nIterations;
 double      **xx,*yy,*yy1,*vv,*f,*cumw,*cs;
-double      *psi,*alpha,beta1;
-
+double      *psi,*derivative,beta1,*alpha;
 
 double  criterion(double beta1);
 void    sort_alpha(int m, int n, double **xx, double alpha[], double vv[], double yy[]);
@@ -43,20 +41,23 @@ void    swap(double *x,double *y);
 
 // [[Rcpp::export]]
 
-List ComputeSSE(NumericMatrix X, NumericVector y, int m1)
+List ComputeLSE(NumericMatrix X, NumericVector y)
 {
     int     i,j;
     double  pi;
     
     pi=4*atan(1);
     
+    beta1=pi/4;
+       
     // determine the sample size
     
     n = (int)(y.size());
     
     // m is the dimension
+    m= 2;
     
-    m= (int)m1;
+    nIterations=100;
     
     // copy the data vector for use of the C++ procedures
     
@@ -86,10 +87,8 @@ List ComputeSSE(NumericMatrix X, NumericVector y, int m1)
     
     cumw[0]=cs[0]=0;
     
-    beta1=pi/4;
-    
     beta1 = golden(0,pi/2,criterion);
-     
+    
     alpha[0]=cos(beta1);
     alpha[1]=sin(beta1);
 
@@ -100,6 +99,7 @@ List ComputeSSE(NumericMatrix X, NumericVector y, int m1)
         out0(i,0)=vv[i];
         out0(i,1)=yy[i];
     }
+    
     
     NumericVector out1 = NumericVector(m);
     
@@ -116,7 +116,6 @@ List ComputeSSE(NumericMatrix X, NumericVector y, int m1)
         out2(i,1)=psi[i];
     }
 
-
     // make the list for the output, containing alpha and the estimate of psi
     
     List out = List::create(Rcpp::Named("data")=out0,Rcpp::Named("alpha")=out1,Rcpp::Named("psi")=out2);
@@ -128,15 +127,16 @@ List ComputeSSE(NumericMatrix X, NumericVector y, int m1)
     
     delete[] xx;
     
-    delete[] yy; delete[] yy1; delete[] vv; delete[] alpha; delete[] f;
+    delete[] yy, delete[] yy1; delete[] vv; delete[] alpha; delete[] f;
     delete[] cumw; delete[] cs; delete[] psi;
     
     return out;
 }
 
+
 double criterion(double beta1)
 {
-    int i,j;
+    int i;
     double sum;
     
     alpha[0]=cos(beta1);
@@ -145,12 +145,12 @@ double criterion(double beta1)
     sort_alpha(m,n,xx,alpha,vv,yy);
     
     cs[0]=cumw[0]=0;
-    
+      
     yy1[0]=0;
-    
+      
     for (i=1;i<=n;i++)
         yy1[i]=yy[i-1];
-    
+      
     for (i=1;i<=n;i++)
     {
         cumw[i]=i*1.0;
@@ -162,19 +162,10 @@ double criterion(double beta1)
     for (i=0;i<n;i++)
         psi[i]=yy1[i+1];
     
-    for (j=0;j<m;j++)
-        f[j]=0;
-    
-    for (j=0;j<m;j++)
-    {
-        for (i=0;i<n;i++)
-            f[j] += xx[i][j]*(psi[i]-yy[i])/n;
-    }
-    
     sum=0;
     
-    for (i=0;i<m;i++)
-        sum += SQR(f[i]);
+    for (i=0;i<n;i++)
+        sum += SQR(psi[i]-yy[i])/n;
     
     return sum;
     
@@ -210,6 +201,7 @@ double golden(double a1, double b1, double (*f)(double))
   
 }
 
+
 void convexmin(int n, double cumw[], double cs[], double y[])
 {
   int    i, j, m;
@@ -233,6 +225,7 @@ void convexmin(int n, double cumw[], double cs[], double y[])
     }
   }
 }
+
 
 
 int CompareTime(const void *a, const void *b)
@@ -296,7 +289,6 @@ void sort_alpha(int m, int n, double **xx, double alpha[], double vv[], double y
         delete[] xx_new[i];
     delete[] xx_new;
 }
-
 
 void swap(double *x,double *y)
 {
