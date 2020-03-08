@@ -87,7 +87,6 @@ List Compute_spline(NumericMatrix X, NumericVector y)
     rr = new double *[n];
     for (i=0;i<n;i++)
           rr[i] = new double [2];
-      
     
     beta1 = golden(0,pi/2,criterion);
      
@@ -109,9 +108,10 @@ List Compute_spline(NumericMatrix X, NumericVector y)
     for (i=0;i<m;i++)
         out1(i)=alpha[i];
     
-    // make the list for the output, containing alpha and the observation points
+    // make the list for the output, containing alpha and the data points
         
     List out = List::create(Rcpp::Named("data")=out0,Rcpp::Named("alpha")=out1);
+    
     
     // free memory
    
@@ -139,8 +139,6 @@ double criterion(double beta)
     alpha[1]=sin(beta);
     
     sort_alpha(m,n,xx,alpha,vv,yy);
-    
-    //mu=SQR((vv[n-1]-vv[0])*pow(n,-0.25))/log(n);
     
     Compute_cubic_spline();
     

@@ -1369,47 +1369,6 @@ B<-read.table("derivative.txt")#
    plot(c(-1000,-1000),xlim=c(min(x),max(x)), ylim=c(min(y),max(y)), main= "",ylab="",xlab="",bty="n",las=1)#
    lines(x,y,lwd=2,col="blue")#
     lines(x0,y0,lwd=2,lty=2,col="red")
-B<-read.table("psi.txt")#
-   f <- function(x) {x^3}#
-   x<-B[,1]#
-   y<-B[,2]#
-    x0 <-seq(min(x),max(x),by=0.01)#
-    y0<-f(x0)#
-   plot(c(-1000,-1000),xlim=c(min(x),max(x)), ylim=c(min(y),max(y)), main= "",ylab="",xlab="",bty="n",las=1)#
-   lines(x,y,lwd=2,col="blue")#
-   lines(x0,y0,lwd=2,lty=2,col="red")
-#########################################################
-####   MONOTONE REGRESSION        #######
-#########################################################
-n=100#
-#
-B<-read.table("EDR.txt")#
-colMeans(B)#
-n*cov(B)#
-#
-B<-read.table("LSE.txt")#
-colMeans(B)#
-n*cov(B)#
-#
-B<-read.table("ESE.txt")#
-colMeans(B)#
-n*cov(B)#
-#
-B<-read.table("SSE.txt")#
-colMeans(B)#
-n*cov(B)#
-#
-B<-read.table("spline.txt")#
-colMeans(B)#
-n*cov(B)#
-#
-B<-read.table("MAVE.txt")#
-colMeans(B)#
-n*cov(B)#
-#
-B<-read.table("EFM.txt")#
-colMeans(B)#
-n*cov(B)
 #########################################################
 ####   MONOTONE REGRESSION        #######
 #########################################################
@@ -1629,38 +1588,6 @@ dev.off()
 #########################################################
 ####   MONOTONE REGRESSION        #######
 #########################################################
-n=1000#
-#
-B<-read.table("EDR.txt")#
-colMeans(B)#
-n*cov(B)#
-#
-B<-read.table("LSE.txt")#
-colMeans(B)#
-n*cov(B)#
-#
-B<-read.table("ESE.txt")#
-colMeans(B)#
-n*cov(B)#
-#
-B<-read.table("SSE.txt")#
-colMeans(B)#
-n*cov(B)#
-#
-B<-read.table("spline.txt")#
-colMeans(B)#
-n*cov(B)#
-#
-B<-read.table("MAVE.txt")#
-colMeans(B)#
-n*cov(B)#
-#
-B<-read.table("EFM.txt")#
-colMeans(B)#
-n*cov(B)
-#########################################################
-####   MONOTONE REGRESSION        #######
-#########################################################
 rm(list=ls())#
 source('fpigsim.R')#
 source('fisher.R')#
@@ -1766,6 +1693,294 @@ dev.off()#
     lines(x1,y1,col="blue",lwd=2)#
     lines(x0,y0,lwd=2,col="red",lty=2)#
     points(x,y,pch = 21)
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+rm(list=ls())#
+source('fpigsim.R')#
+source('fisher.R')#
+library(locfit)#
+library(Rcpp)#
+library(MAVE)#
+library(EDR)#
+library(MASS)#
+sourceCpp("SSE.cpp")#
+sourceCpp("ESE.cpp")#
+sourceCpp("LSE.cpp")#
+sourceCpp("spline.cpp")#
+#
+  NumIt = 100#
+  n = 100#
+  m= 2#
+  sigma = 1#
+  a0 = c(1/sqrt(2),1/sqrt(2))#
+  timeMat <- NULL#
+   normMat <- matrix(0, nrow= NumIt, ncol= 7)#
+  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","EFM","MAVE")#
+for (j in 1: NumIt){#
+  sim = 1+j#
+  set.seed(sim)#
+  print(j)#
+	X = matrix(runif(m*n,0,1),n,m, byrow = FALSE)#
+	z=X%*%a0#
+	y=(z)^3 + rnorm(n,0,sigma)#
+	#y=rbinom(n,10,exp(z)/(1+exp(z)))#
+#
+	# EDR estimate proposed by Hristache et al.#
+	starter_edr = proc.time()#
+	EDR <- edr(X,y,method = "HJPS")#
+	edr_hat = -summary(EDR)$Rhat[1,] #
+	time_edr = (proc.time() -starter_edr)[3]#
+	# LSE#
+	starter_lse = proc.time()#
+	LSE <- ComputeLSE(X,y)#
+	lse_hat = LSE$alpha#
+	time_lse = (proc.time() -starter_lse)[3]#
+	# SSE#
+	starter_sse = proc.time()#
+	SSE <- ComputeSSE(X,y)#
+	sse_hat = SSE$alpha#
+	time_sse = (proc.time() -starter_sse)[3]#
+	# ESE#
+	starter_ese = proc.time()#
+	ESE <- ComputeESE(X,y)#
+	ese_hat = ESE$alpha#
+	time_ese = (proc.time() -starter_ese)[3]#
+	# spline#
+	starter_spline = proc.time()	#
+	spline <-Compute_spline(X,y)#
+	spline_hat = spline$alpha#
+	time_spline = (proc.time() -starter_spline)[3]#
+#
+	# MAVE#
+	starter_MAVE = proc.time()#
+	MAVE <- mave.compute(X,y,method = 'meanmave')#
+	MAVE_hat = MAVE$dir[[1]]#
+	if (MAVE_hat[1]<0)#
+	{#
+		MAVE_hat[1]=-MAVE_hat[1]#
+		MAVE_hat[2]=-MAVE_hat[2]#
+	}#
+	time_MAVE = (proc.time() -starter_MAVE)[3]#
+# EFM#
+starter_EFM = proc.time()#
+EFM <- fisher(X,y,1,mymodel="none")#
+EFM_hat <- EFM$root#
+time_EFM = (proc.time()-starter_EFM)[3]#
+#
+  write(edr_hat,file = "EDR.txt", ncol =m, append = TRUE)#
+  write(ese_hat,file = "ESE.txt", ncol =m, append = TRUE)#
+  write(sse_hat,file = "SSE.txt", ncol =m, append = TRUE)#
+  write(lse_hat,file = "LSE.txt", ncol =m, append = TRUE)#
+  write(MAVE_hat,file = "MAVE.txt", ncol =m, append = TRUE)#
+  write(EFM_hat,file = "EFM.txt", ncol =m, append = TRUE)#
+  write(spline_hat,file = "spline.txt", ncol =m, append = TRUE)#
+  normMat[j,]  = c(norm(edr_hat- a0,"2"),norm(sse_hat- a0, "2"),norm(ese_hat- a0, "2"),norm(lse_hat-a0, "2"),norm(spline_hat-a0, "2"),norm(EFM_hat-a0, "2"),norm(MAVE_hat-a0, "2"))#
+timeMat<-rbind(timeMat,c(time_edr,time_sse,time_ese,time_lse,time_spline,time_MAVE))#
+}#
+#
+colnames(timeMat) <- c("EDR","SSE","ESE","LSE","spline","MAVE")#
+pdf("BoxPlot_alpha_err.pdf")#
+boxplot(normMat,las=1)#
+boxplot(timeMat, main="Run Times", las=1) #
+dev.off()#
+#
+	A <- spline$psi#
+	C <- spline$data#
+#
+   x1<-A[,1]#
+    y1<-A[,2]#
+    x<-C[,1]#
+   	y<-C[,2]#
+#
+    f <- function(x) {x^3}#
+    #f <- function(x) {10*exp(x)/(1+exp(x))}#
+    x0<-seq(min(x1,x),max(x1,x),by=0.01)#
+    y0<-f(x0)#
+    plot(c(-10000,-10000),xlim=c(min(x1,x),max(x1,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x1,y1,col="blue",lwd=2)#
+    lines(x0,y0,lwd=2,col="red",lty=2)#
+    points(x,y,pch = 21)
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+rm(list=ls())#
+source('fpigsim.R')#
+source('fisher.R')#
+library(locfit)#
+library(Rcpp)#
+library(MAVE)#
+library(EDR)#
+library(MASS)#
+sourceCpp("SSE.cpp")#
+sourceCpp("ESE.cpp")#
+sourceCpp("LSE.cpp")#
+sourceCpp("spline.cpp")#
+#
+  NumIt = 100#
+  n = 100#
+  m= 2#
+  sigma = 1#
+  a0 = c(1/sqrt(2),1/sqrt(2))#
+  timeMat <- NULL#
+   normMat <- matrix(0, nrow= NumIt, ncol= 7)#
+  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","EFM","MAVE")#
+for (j in 1: NumIt){#
+  sim = 1+j#
+  set.seed(sim)#
+  print(j)#
+	X = matrix(runif(m*n,0,1),n,m, byrow = FALSE)#
+	z=X%*%a0#
+	y=(z)^3 + rnorm(n,0,sigma)#
+	#y=rbinom(n,10,exp(z)/(1+exp(z)))#
+#
+	# EDR estimate proposed by Hristache et al.#
+	starter_edr = proc.time()#
+	EDR <- edr(X,y,method = "HJPS")#
+	edr_hat = -summary(EDR)$Rhat[1,] #
+	time_edr = (proc.time() -starter_edr)[3]#
+	# LSE#
+	starter_lse = proc.time()#
+	LSE <- ComputeLSE(X,y)#
+	lse_hat = LSE$alpha#
+	time_lse = (proc.time() -starter_lse)[3]#
+	# SSE#
+	starter_sse = proc.time()#
+	SSE <- ComputeSSE(X,y)#
+	sse_hat = SSE$alpha#
+	time_sse = (proc.time() -starter_sse)[3]#
+	# ESE#
+	starter_ese = proc.time()#
+	ESE <- ComputeESE(X,y)#
+	ese_hat = ESE$alpha#
+	time_ese = (proc.time() -starter_ese)[3]#
+	# spline#
+	starter_spline = proc.time()	#
+	spline <-Compute_spline(X,y)#
+	spline_hat = spline$alpha#
+	time_spline = (proc.time() -starter_spline)[3]#
+#
+	# MAVE#
+	starter_MAVE = proc.time()#
+	MAVE <- mave.compute(X,y,method = 'meanmave')#
+	MAVE_hat = MAVE$dir[[1]]#
+	if (MAVE_hat[1]<0)#
+	{#
+		MAVE_hat[1]=-MAVE_hat[1]#
+		MAVE_hat[2]=-MAVE_hat[2]#
+	}#
+	time_MAVE = (proc.time() -starter_MAVE)[3]#
+# EFM#
+starter_EFM = proc.time()#
+EFM <- fisher(X,y,1,mymodel="none")#
+EFM_hat <- EFM$root#
+time_EFM = (proc.time()-starter_EFM)[3]#
+#
+  write(edr_hat,file = "EDR.txt", ncol =m, append = TRUE)#
+  write(ese_hat,file = "ESE.txt", ncol =m, append = TRUE)#
+  write(sse_hat,file = "SSE.txt", ncol =m, append = TRUE)#
+  write(lse_hat,file = "LSE.txt", ncol =m, append = TRUE)#
+  write(MAVE_hat,file = "MAVE.txt", ncol =m, append = TRUE)#
+  write(EFM_hat,file = "EFM.txt", ncol =m, append = TRUE)#
+  write(spline_hat,file = "spline.txt", ncol =m, append = TRUE)#
+  normMat[j,]  = c(norm(edr_hat- a0,"2"),norm(sse_hat- a0, "2"),norm(ese_hat- a0, "2"),norm(lse_hat-a0, "2"),norm(spline_hat-a0, "2"),norm(EFM_hat-a0, "2"),norm(MAVE_hat-a0, "2"))#
+timeMat<-rbind(timeMat,c(time_edr,time_sse,time_ese,time_lse,time_spline,time_MAVE))#
+}#
+#
+colnames(timeMat) <- c("EDR","SSE","ESE","LSE","spline","MAVE")#
+pdf("BoxPlot_alpha_err.pdf")#
+boxplot(normMat,las=1)#
+boxplot(timeMat, main="Run Times", las=1) #
+dev.off()#
+#
+	A <- ESE$psi#
+	C <- ESE$data#
+#
+   x1<-A[,1]#
+    y1<-A[,2]#
+    x<-C[,1]#
+   	y<-C[,2]#
+#
+    f <- function(x) {x^3}#
+    #f <- function(x) {10*exp(x)/(1+exp(x))}#
+    x0<-seq(min(x1,x),max(x1,x),by=0.01)#
+    y0<-f(x0)#
+    plot(c(-10000,-10000),xlim=c(min(x1,x),max(x1,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x1,y1,col="blue",lwd=2)#
+    lines(x0,y0,lwd=2,col="red",lty=2)#
+    points(x,y,pch = 21)
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+rm(list=ls())#
+#
+  n = 500#
+  m = 2#
+  NumIt = 1000#
+  a0 = c(rep(1,m))/sqrt(m)#
+  normMat <- matrix(0, nrow= NumIt, ncol= 7)#
+  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","MAVE","EFM")#
+#
+edr <- read.table("EDR.txt")#
+lse <- read.table("LSE.txt")#
+ese <- read.table("ESE.txt")#
+sse <- read.table("SSE.txt")#
+spline <- read.table("spline.txt")#
+mave <- read.table("MAVE.txt")#
+efm <- read.table("EFM.txt")#
+#
+for (j in 1:NumIt)#
+{#
+	edr_hat<-edr[j,]#
+ 	sse_hat<-sse[j,]#
+ 	ese_hat<-ese[j,]#
+ 	lse_hat<-lse[j,]#
+ 	spline_hat<-spline[j,]#
+ 	mave_hat<-mave[j,]#
+ 	efm_hat<-efm[j,]#
+  	normMat[j,]  = c(min(0.6,norm(edr_hat- a0, "2")),norm(sse_hat- a0, "2"),#
+  	                 norm(ese_hat- a0, "2"),norm(lse_hat-a0, "2"),norm(spline_hat-a0, "2"),norm(mave_hat-a0, "2"),norm(efm_hat-a0, "2")) #
+}#
+#
+pdf("BoxPlot_alpha_err.pdf")#
+boxplot(normMat,las=1)#
+dev.off()
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+rm(list=ls())#
+#
+  n = 100#
+  m = 2#
+  NumIt = 100#
+  a0 = c(rep(1,m))/sqrt(m)#
+  normMat <- matrix(0, nrow= NumIt, ncol= 7)#
+  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","MAVE","EFM")#
+#
+edr <- read.table("EDR.txt")#
+lse <- read.table("LSE.txt")#
+ese <- read.table("ESE.txt")#
+sse <- read.table("SSE.txt")#
+spline <- read.table("spline.txt")#
+mave <- read.table("MAVE.txt")#
+efm <- read.table("EFM.txt")#
+#
+for (j in 1:NumIt)#
+{#
+	edr_hat<-edr[j,]#
+ 	sse_hat<-sse[j,]#
+ 	ese_hat<-ese[j,]#
+ 	lse_hat<-lse[j,]#
+ 	spline_hat<-spline[j,]#
+ 	mave_hat<-mave[j,]#
+ 	efm_hat<-efm[j,]#
+  	normMat[j,]  = c(min(0.6,norm(edr_hat- a0, "2")),norm(sse_hat- a0, "2"),#
+  	                 norm(ese_hat- a0, "2"),norm(lse_hat-a0, "2"),norm(spline_hat-a0, "2"),norm(mave_hat-a0, "2"),norm(efm_hat-a0, "2")) #
+}#
+#
+pdf("BoxPlot_alpha_err.pdf")#
+boxplot(normMat,las=1)#
+dev.off()
 #########################################################
 ####   MONOTONE REGRESSION        #######
 #########################################################
@@ -1890,8 +2105,8 @@ boxplot(normMat,las=1)#
 boxplot(timeMat, main="Run Times", las=1) #
 dev.off()#
 #
-	A <- spline$psi#
-	C <- spline$data#
+	A <- ESE$psi#
+	C <- ESE$data#
 #
    x1<-A[,1]#
     y1<-A[,2]#
@@ -1903,7 +2118,7 @@ dev.off()#
     x0<-seq(min(x1,x),max(x1,x),by=0.01)#
     y0<-f(x0)#
     plot(c(-10000,-10000),xlim=c(min(x1,x),max(x1,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
-    lines(x1,y1,col="blue",lwd=2)#
+    lines(x1,y1,col="blue",lwd=2,type='s')#
     lines(x0,y0,lwd=2,col="red",lty=2)#
     points(x,y,pch = 21)
 #########################################################
@@ -1922,7 +2137,127 @@ sourceCpp("ESE.cpp")#
 sourceCpp("LSE.cpp")#
 sourceCpp("spline.cpp")#
 #
-  NumIt = 100#
+  NumIt = 10#
+  n = 100#
+  m= 2#
+  sigma = 1#
+  a0 = c(1/sqrt(2),1/sqrt(2))#
+  #out=matrix(0,NumIt,m)#
+  timeMat <- NULL#
+   normMat <- matrix(0, nrow= NumIt, ncol= 7)#
+  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","EFM","MAVE")#
+for (j in 1: NumIt){#
+  sim = 1+j#
+  set.seed(sim)#
+  print(j)#
+	X = matrix(runif(m*n,0,1),n,m, byrow = FALSE)#
+	z=X%*%a0#
+	#y=(z)^3 + rnorm(n,0,sigma)#
+	y=rbinom(n,10,exp(z)/(1+exp(z)))#
+#
+	# EDR estimate proposed by Hristache et al.#
+	starter_edr = proc.time()#
+	EDR <- edr(X,y,method = "HJPS")#
+	edr_hat = -summary(EDR)$Rhat[1,] #
+	time_edr = (proc.time() -starter_edr)[3]#
+	# LSE#
+	starter_lse = proc.time()#
+	LSE <- ComputeLSE(X,y)#
+	lse_hat = LSE$alpha#
+	time_lse = (proc.time() -starter_lse)[3]#
+	# SSE#
+	starter_sse = proc.time()#
+	SSE <- ComputeSSE(X,y)#
+	sse_hat = SSE$alpha#
+	time_sse = (proc.time() -starter_sse)[3]#
+	# ESE#
+	starter_ese = proc.time()#
+	ESE <- ComputeESE(X,y)#
+	ese_hat = ESE$alpha#
+	time_ese = (proc.time() -starter_ese)[3]#
+	# spline#
+	starter_spline = proc.time()	#
+	spline <-Compute_spline(X,y)#
+	spline_hat = spline$alpha#
+	time_spline = (proc.time() -starter_spline)[3]#
+#
+	# MAVE#
+	starter_MAVE = proc.time()#
+	MAVE <- mave.compute(X,y,method = 'meanmave')#
+	MAVE_hat = MAVE$dir[[1]]#
+	if (MAVE_hat[1]<0)#
+	{#
+		MAVE_hat[1]=-MAVE_hat[1]#
+		MAVE_hat[2]=-MAVE_hat[2]#
+	}#
+	time_MAVE = (proc.time() -starter_MAVE)[3]#
+# EFM#
+starter_EFM = proc.time()#
+EFM <- fisher(X,y,1,mymodel="none")#
+EFM_hat <- EFM$root#
+time_EFM = (proc.time()-starter_EFM)[3]#
+#
+  write(edr_hat,file = "EDR.txt", ncol =m, append = TRUE)#
+  write(ese_hat,file = "ESE.txt", ncol =m, append = TRUE)#
+  write(sse_hat,file = "SSE.txt", ncol =m, append = TRUE)#
+  write(lse_hat,file = "LSE.txt", ncol =m, append = TRUE)#
+  write(MAVE_hat,file = "MAVE.txt", ncol =m, append = TRUE)#
+  write(EFM_hat,file = "EFM.txt", ncol =m, append = TRUE)#
+  write(spline_hat,file = "spline.txt", ncol =m, append = TRUE)#
+  normMat[j,]  = c(norm(edr_hat- a0,"2"),norm(sse_hat- a0, "2"),norm(ese_hat- a0, "2"),norm(lse_hat-a0, "2"),norm(spline_hat-a0, "2"),norm(EFM_hat-a0, "2"),norm(MAVE_hat-a0, "2"))#
+timeMat<-rbind(timeMat,c(time_edr,time_sse,time_ese,time_lse,time_spline,time_EFM,time_MAVE))#
+}#
+#
+colnames(timeMat) <- c("EDR","SSE","ESE","LSE","spline","EFM","MAVE")#
+pdf("BoxPlot_alpha_err.pdf")#
+boxplot(normMat,las=1)#
+boxplot(timeMat, main="Run Times", las=1) #
+dev.off()#
+#
+	A <- ESE$psi#
+	B <- ESE$derivative#
+	C <- ESE$data#
+#
+   x1<-A[,1]#
+    y1<-A[,2]#
+    x2<-B[,1]#
+    y2<-B[,2]#
+    x<-C[,1]#
+   	y<-C[,2]#
+#
+    #f <- function(x) {x^3}#
+    f <- function(x) {10*exp(x)/(1+exp(x))}#
+    x0<-seq(min(x1,x2,x),max(x1,x2,x),by=0.01)#
+    y0<-f(x0)#
+    plot(c(-10000,-10000),xlim=c(min(x2,x),max(x1,x2,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x1,y1,col="blue",lwd=2,type='s')#
+    lines(x0,y0,lwd=2,col="red",lty=2)#
+    points(x,y,pch = 21)#
+#
+#f <- function(x) {3*x^2}#
+    #f <- function(x) {10*exp(x)/(1+exp(x))}#
+    #x0<-seq(min(x2),max(x2),by=0.01)#
+    #y0<-f(x0)#
+#plot(c(-10000,-10000),xlim=c(min(x2),max(x2)), ylim=c(min(y0,y2),max(y0,y2)), main= "",ylab="",xlab="",bty="n",las=1)#
+    #lines(x2,y2,col="blue",lwd=2)#
+    #lines(x0,y0,lwd=2,col="red",lty=2)
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+rm(list=ls())#
+source('fpigsim.R')#
+source('fisher.R')#
+library(locfit)#
+library(Rcpp)#
+library(MAVE)#
+library(EDR)#
+library(MASS)#
+sourceCpp("SSE.cpp")#
+sourceCpp("ESE.cpp")#
+sourceCpp("LSE.cpp")#
+sourceCpp("spline.cpp")#
+#
+  NumIt = 1000#
   n = 100#
   m= 2#
   sigma = 1#
@@ -2011,85 +2346,18 @@ dev.off()#
     x0<-seq(min(x1,x),max(x1,x),by=0.01)#
     y0<-f(x0)#
     plot(c(-10000,-10000),xlim=c(min(x1,x),max(x1,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
-    lines(x1,y1,col="blue",lwd=2)#
-    lines(x0,y0,lwd=2,col="red",lty=2)#
-    points(x,y,pch = 21)
-plot(c(-10000,-10000),xlim=c(min(x1,x),max(x1,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
     lines(x1,y1,col="blue",lwd=2,type='s')#
     lines(x0,y0,lwd=2,col="red",lty=2)#
     points(x,y,pch = 21)
-#########################################################
-####   MONOTONE REGRESSION        #######
-#########################################################
-rm(list=ls())#
-#
-  n = 500#
-  m = 2#
-  NumIt = 1000#
-  a0 = c(rep(1,m))/sqrt(m)#
-  normMat <- matrix(0, nrow= NumIt, ncol= 7)#
-  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","MAVE","EFM")#
-#
-edr <- read.table("EDR.txt")#
-lse <- read.table("LSE.txt")#
-ese <- read.table("ESE.txt")#
-sse <- read.table("SSE.txt")#
-spline <- read.table("spline.txt")#
-mave <- read.table("MAVE.txt")#
-efm <- read.table("EFM.txt")#
-#
-for (j in 1:NumIt)#
-{#
-	edr_hat<-edr[j,]#
- 	sse_hat<-sse[j,]#
- 	ese_hat<-ese[j,]#
- 	lse_hat<-lse[j,]#
- 	spline_hat<-spline[j,]#
- 	mave_hat<-mave[j,]#
- 	efm_hat<-efm[j,]#
-  	normMat[j,]  = c(min(0.6,norm(edr_hat- a0, "2")),norm(sse_hat- a0, "2"),#
-  	                 norm(ese_hat- a0, "2"),norm(lse_hat-a0, "2"),norm(spline_hat-a0, "2"),norm(mave_hat-a0, "2"),norm(efm_hat-a0, "2")) #
-}#
-#
-pdf("BoxPlot_alpha_err.pdf")#
-boxplot(normMat,las=1)#
-dev.off()
-#########################################################
-####   MONOTONE REGRESSION        #######
-#########################################################
-rm(list=ls())#
-#
-  n = 100#
-  m = 2#
-  NumIt = 100#
-  a0 = c(rep(1,m))/sqrt(m)#
-  normMat <- matrix(0, nrow= NumIt, ncol= 7)#
-  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","MAVE","EFM")#
-#
-edr <- read.table("EDR.txt")#
-lse <- read.table("LSE.txt")#
-ese <- read.table("ESE.txt")#
-sse <- read.table("SSE.txt")#
-spline <- read.table("spline.txt")#
-mave <- read.table("MAVE.txt")#
-efm <- read.table("EFM.txt")#
-#
-for (j in 1:NumIt)#
-{#
-	edr_hat<-edr[j,]#
- 	sse_hat<-sse[j,]#
- 	ese_hat<-ese[j,]#
- 	lse_hat<-lse[j,]#
- 	spline_hat<-spline[j,]#
- 	mave_hat<-mave[j,]#
- 	efm_hat<-efm[j,]#
-  	normMat[j,]  = c(min(0.6,norm(edr_hat- a0, "2")),norm(sse_hat- a0, "2"),#
-  	                 norm(ese_hat- a0, "2"),norm(lse_hat-a0, "2"),norm(spline_hat-a0, "2"),norm(mave_hat-a0, "2"),norm(efm_hat-a0, "2")) #
-}#
-#
-pdf("BoxPlot_alpha_err.pdf")#
-boxplot(normMat,las=1)#
-dev.off()
+B<-read.table("psi.txt")#
+   f <- function(x) {x^3}#
+   x<-B[,1]#
+   y<-B[,2]#
+    x0 <-seq(min(x),max(x),by=0.01)#
+    y0<-f(x0)#
+   plot(c(-1000,-1000),xlim=c(min(x),max(x)), ylim=c(min(y),max(y)), main= "",ylab="",xlab="",bty="n",las=1)#
+   lines(x,y,lwd=2,col="blue")#
+   lines(x0,y0,lwd=2,lty=2,col="red")
 #########################################################
 ####   MONOTONE REGRESSION        #######
 #########################################################
@@ -2107,7 +2375,7 @@ sourceCpp("LSE.cpp")#
 sourceCpp("spline.cpp")#
 #
   NumIt = 100#
-  n = 100#
+  n = 1000#
   m= 2#
   sigma = 1#
   a0 = c(1/sqrt(2),1/sqrt(2))#
@@ -2231,6 +2499,181 @@ sourceCpp("spline.cpp")#
   m= 2#
   sigma = 1#
   a0 = c(1/sqrt(2),1/sqrt(2))#
+  #out=matrix(0,NumIt,m)#
+  timeMat <- NULL#
+   normMat <- matrix(0, nrow= NumIt, ncol= 7)#
+  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","EFM","MAVE")#
+for (j in 1: NumIt){#
+  sim = 1+j#
+  set.seed(sim)#
+  print(j)#
+	X = matrix(runif(m*n,0,1),n,m, byrow = FALSE)#
+	z=X%*%a0#
+	#y=(z)^3 + rnorm(n,0,sigma)#
+	y=rbinom(n,10,exp(z)/(1+exp(z)))#
+#
+	# EDR estimate proposed by Hristache et al.#
+	starter_edr = proc.time()#
+	EDR <- edr(X,y,method = "HJPS")#
+	edr_hat = -summary(EDR)$Rhat[1,] #
+	time_edr = (proc.time() -starter_edr)[3]#
+	# LSE#
+	starter_lse = proc.time()#
+	LSE <- ComputeLSE(X,y)#
+	lse_hat = LSE$alpha#
+	time_lse = (proc.time() -starter_lse)[3]#
+	# SSE#
+	starter_sse = proc.time()#
+	SSE <- ComputeSSE(X,y)#
+	sse_hat = SSE$alpha#
+	time_sse = (proc.time() -starter_sse)[3]#
+	# ESE#
+	starter_ese = proc.time()#
+	ESE <- ComputeESE(X,y)#
+	ese_hat = ESE$alpha#
+	time_ese = (proc.time() -starter_ese)[3]#
+	# spline#
+	starter_spline = proc.time()	#
+	spline <-Compute_spline(X,y)#
+	spline_hat = spline$alpha#
+	time_spline = (proc.time() -starter_spline)[3]#
+#
+	# MAVE#
+	starter_MAVE = proc.time()#
+	MAVE <- mave.compute(X,y,method = 'meanmave')#
+	MAVE_hat = MAVE$dir[[1]]#
+	if (MAVE_hat[1]<0)#
+	{#
+		MAVE_hat[1]=-MAVE_hat[1]#
+		MAVE_hat[2]=-MAVE_hat[2]#
+	}#
+	time_MAVE = (proc.time() -starter_MAVE)[3]#
+# EFM#
+starter_EFM = proc.time()#
+EFM <- fisher(X,y,1,mymodel="none")#
+EFM_hat <- EFM$root#
+time_EFM = (proc.time()-starter_EFM)[3]#
+#
+  write(edr_hat,file = "EDR.txt", ncol =m, append = TRUE)#
+  write(ese_hat,file = "ESE.txt", ncol =m, append = TRUE)#
+  write(sse_hat,file = "SSE.txt", ncol =m, append = TRUE)#
+  write(lse_hat,file = "LSE.txt", ncol =m, append = TRUE)#
+  write(MAVE_hat,file = "MAVE.txt", ncol =m, append = TRUE)#
+  write(EFM_hat,file = "EFM.txt", ncol =m, append = TRUE)#
+  write(spline_hat,file = "spline.txt", ncol =m, append = TRUE)#
+  normMat[j,]  = c(norm(edr_hat- a0,"2"),norm(sse_hat- a0, "2"),norm(ese_hat- a0, "2"),norm(lse_hat-a0, "2"),norm(spline_hat-a0, "2"),norm(EFM_hat-a0, "2"),norm(MAVE_hat-a0, "2"))#
+timeMat<-rbind(timeMat,c(time_edr,time_sse,time_ese,time_lse,time_spline,time_EFM,time_MAVE))#
+}#
+#
+colnames(timeMat) <- c("EDR","SSE","ESE","LSE","spline","EFM","MAVE")#
+pdf("BoxPlot_alpha_err.pdf")#
+boxplot(normMat,las=1)#
+boxplot(timeMat, main="Run Times", las=1) #
+dev.off()#
+#
+	A <- ESE$psi#
+	B <- ESE$derivative#
+	C <- ESE$data#
+#
+   x1<-A[,1]#
+    y1<-A[,2]#
+    x2<-B[,1]#
+    y2<-B[,2]#
+    x<-C[,1]#
+   	y<-C[,2]#
+#
+    #f <- function(x) {x^3}#
+    f <- function(x) {10*exp(x)/(1+exp(x))}#
+    x0<-seq(min(x1,x2,x),max(x1,x2,x),by=0.01)#
+    y0<-f(x0)#
+    plot(c(-10000,-10000),xlim=c(min(x2,x),max(x1,x2,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x1,y1,col="blue",lwd=2,type='s')#
+    lines(x0,y0,lwd=2,col="red",lty=2)#
+    points(x,y,pch = 21)#
+#
+#f <- function(x) {3*x^2}#
+    #f <- function(x) {10*exp(x)/(1+exp(x))}#
+    #x0<-seq(min(x2),max(x2),by=0.01)#
+    #y0<-f(x0)#
+#plot(c(-10000,-10000),xlim=c(min(x2),max(x2)), ylim=c(min(y0,y2),max(y0,y2)), main= "",ylab="",xlab="",bty="n",las=1)#
+    #lines(x2,y2,col="blue",lwd=2)#
+    #lines(x0,y0,lwd=2,col="red",lty=2)
+A <- spline$psi#
+	B <- ESE$derivative#
+	C <- spline$data#
+#
+   x1<-A[,1]#
+    y1<-A[,2]#
+    x2<-B[,1]#
+    y2<-B[,2]#
+    x<-C[,1]#
+   	y<-C[,2]#
+#
+    #f <- function(x) {x^3}#
+    f <- function(x) {10*exp(x)/(1+exp(x))}#
+    x0<-seq(min(x1,x2,x),max(x1,x2,x),by=0.01)#
+    y0<-f(x0)#
+    plot(c(-10000,-10000),xlim=c(min(x2,x),max(x1,x2,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x1,y1,col="blue",lwd=2,type='s')#
+    lines(x0,y0,lwd=2,col="red",lty=2)#
+    points(x,y,pch = 21)
+plot(c(-10000,-10000),xlim=c(min(x2,x),max(x1,x2,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x1,y1,col="blue",lwd=2)#
+    lines(x0,y0,lwd=2,col="red",lty=2)#
+    points(x,y,pch = 21)
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+n=100#
+#
+B<-read.table("EDR.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("LSE.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("ESE.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("SSE.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("spline.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("MAVE.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("EFM.txt")#
+colMeans(B)#
+n*cov(B)
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+rm(list=ls())#
+source('fpigsim.R')#
+source('fisher.R')#
+library(locfit)#
+library(Rcpp)#
+library(MAVE)#
+library(EDR)#
+library(MASS)#
+sourceCpp("SSE.cpp")#
+sourceCpp("ESE.cpp")#
+sourceCpp("LSE.cpp")#
+sourceCpp("spline.cpp")#
+#
+  NumIt = 1000#
+  n = 5000#
+  m= 2#
+  sigma = 1#
+  a0 = c(1/sqrt(2),1/sqrt(2))#
   timeMat <- NULL#
    normMat <- matrix(0, nrow= NumIt, ncol= 7)#
   colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","EFM","MAVE")#
@@ -2315,6 +2758,774 @@ dev.off()#
     x0<-seq(min(x1,x),max(x1,x),by=0.01)#
     y0<-f(x0)#
     plot(c(-10000,-10000),xlim=c(min(x1,x),max(x1,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x1,y1,col="blue",lwd=2,type='s')#
+    lines(x0,y0,lwd=2,col="red",lty=2)#
+    points(x,y,pch = 21)
+B<-read.table("psi.txt")#
+   f <- function(x) {x^3}#
+   x<-B[,1]#
+   y<-B[,2]#
+    x0 <-seq(min(x),max(x),by=0.01)#
+    y0<-f(x0)#
+   plot(c(-1000,-1000),xlim=c(min(x),max(x)), ylim=c(min(y,y0),max(y,y0)), main= "",ylab="",xlab="",bty="n",las=1)#
+   lines(x,y,lwd=2,col="blue")#
+   lines(x0,y0,lwd=2,lty=2,col="red")
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+n=5000#
+#
+B<-read.table("EDR.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("LSE.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("ESE.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("SSE.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("spline.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("MAVE.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("EFM.txt")#
+colMeans(B)#
+n*cov(B)
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+rm(list=ls())#
+source('fpigsim.R')#
+source('fisher.R')#
+library(locfit)#
+library(Rcpp)#
+library(MAVE)#
+library(EDR)#
+library(MASS)#
+sourceCpp("SSE.cpp")#
+sourceCpp("ESE.cpp")#
+sourceCpp("LSE.cpp")#
+sourceCpp("spline.cpp")#
+#
+  NumIt = 1000#
+  n = 5000#
+  m= 2#
+  sigma = 1#
+  a0 = c(1/sqrt(2),1/sqrt(2))#
+  timeMat <- NULL#
+   normMat <- matrix(0, nrow= NumIt, ncol= 7)#
+  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","EFM","MAVE")#
+for (j in 1: NumIt){#
+  sim = 1000+j#
+  set.seed(sim)#
+  print(j)#
+	X = matrix(runif(m*n,0,1),n,m, byrow = FALSE)#
+	z=X%*%a0#
+	y=(z)^3 + rnorm(n,0,sigma)#
+	#y=rbinom(n,10,exp(z)/(1+exp(z)))#
+#
+	# EDR estimate proposed by Hristache et al.#
+	starter_edr = proc.time()#
+	EDR <- edr(X,y,method = "HJPS")#
+	edr_hat = -summary(EDR)$Rhat[1,] #
+	time_edr = (proc.time() -starter_edr)[3]#
+	# LSE#
+	starter_lse = proc.time()#
+	LSE <- ComputeLSE(X,y)#
+	lse_hat = LSE$alpha#
+	time_lse = (proc.time() -starter_lse)[3]#
+	# SSE#
+	starter_sse = proc.time()#
+	SSE <- ComputeSSE(X,y)#
+	sse_hat = SSE$alpha#
+	time_sse = (proc.time() -starter_sse)[3]#
+	# ESE#
+	starter_ese = proc.time()#
+	ESE <- ComputeESE(X,y)#
+	ese_hat = ESE$alpha#
+	time_ese = (proc.time() -starter_ese)[3]#
+	# spline#
+	starter_spline = proc.time()	#
+	spline <-Compute_spline(X,y)#
+	spline_hat = spline$alpha#
+	time_spline = (proc.time() -starter_spline)[3]#
+#
+	# MAVE#
+	starter_MAVE = proc.time()#
+	MAVE <- mave.compute(X,y,method = 'meanmave')#
+	MAVE_hat = MAVE$dir[[1]]#
+	if (MAVE_hat[1]<0)#
+	{#
+		MAVE_hat[1]=-MAVE_hat[1]#
+		MAVE_hat[2]=-MAVE_hat[2]#
+	}#
+	time_MAVE = (proc.time() -starter_MAVE)[3]#
+# EFM#
+starter_EFM = proc.time()#
+EFM <- fisher(X,y,1,mymodel="none")#
+EFM_hat <- EFM$root#
+time_EFM = (proc.time()-starter_EFM)[3]#
+#
+  write(edr_hat,file = "EDR.txt", ncol =m, append = TRUE)#
+  write(ese_hat,file = "ESE.txt", ncol =m, append = TRUE)#
+  write(sse_hat,file = "SSE.txt", ncol =m, append = TRUE)#
+  write(lse_hat,file = "LSE.txt", ncol =m, append = TRUE)#
+  write(MAVE_hat,file = "MAVE.txt", ncol =m, append = TRUE)#
+  write(EFM_hat,file = "EFM.txt", ncol =m, append = TRUE)#
+  write(spline_hat,file = "spline.txt", ncol =m, append = TRUE)#
+  normMat[j,]  = c(norm(edr_hat- a0,"2"),norm(sse_hat- a0, "2"),norm(ese_hat- a0, "2"),norm(lse_hat-a0, "2"),norm(spline_hat-a0, "2"),norm(EFM_hat-a0, "2"),norm(MAVE_hat-a0, "2"))#
+timeMat<-rbind(timeMat,c(time_edr,time_sse,time_ese,time_lse,time_spline,time_MAVE))#
+}#
+#
+colnames(timeMat) <- c("EDR","SSE","ESE","LSE","spline","MAVE")#
+pdf("BoxPlot_alpha_err.pdf")#
+boxplot(normMat,las=1)#
+boxplot(timeMat, main="Run Times", las=1) #
+dev.off()#
+#
+	A <- ESE$psi#
+	C <- ESE$data#
+#
+   x1<-A[,1]#
+    y1<-A[,2]#
+    x<-C[,1]#
+   	y<-C[,2]#
+#
+    f <- function(x) {x^3}#
+    #f <- function(x) {10*exp(x)/(1+exp(x))}#
+    x0<-seq(min(x1,x),max(x1,x),by=0.01)#
+    y0<-f(x0)#
+    plot(c(-10000,-10000),xlim=c(min(x1,x),max(x1,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x1,y1,col="blue",lwd=2,type='s')#
+    lines(x0,y0,lwd=2,col="red",lty=2)#
+    points(x,y,pch = 21)
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+rm(list=ls())#
+source('fpigsim.R')#
+source('fisher.R')#
+library(locfit)#
+library(Rcpp)#
+library(MAVE)#
+library(EDR)#
+library(MASS)#
+sourceCpp("SSE.cpp")#
+sourceCpp("ESE.cpp")#
+sourceCpp("LSE.cpp")#
+sourceCpp("spline.cpp")#
+#
+  NumIt = 1000#
+  n = 1000#
+  m= 2#
+  sigma = 1#
+  a0 = c(1/sqrt(2),1/sqrt(2))#
+  timeMat <- NULL#
+   normMat <- matrix(0, nrow= NumIt, ncol= 7)#
+  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","EFM","MAVE")#
+for (j in 1: NumIt){#
+  sim = 1+j#
+  set.seed(sim)#
+  print(j)#
+	X = matrix(runif(m*n,0,1),n,m, byrow = FALSE)#
+	z=X%*%a0#
+	y=(z)^3 + rnorm(n,0,sigma)#
+	#y=rbinom(n,10,exp(z)/(1+exp(z)))#
+#
+	# EDR estimate proposed by Hristache et al.#
+	starter_edr = proc.time()#
+	EDR <- edr(X,y,method = "HJPS")#
+	edr_hat = -summary(EDR)$Rhat[1,] #
+	time_edr = (proc.time() -starter_edr)[3]#
+	# LSE#
+	starter_lse = proc.time()#
+	LSE <- ComputeLSE(X,y)#
+	lse_hat = LSE$alpha#
+	time_lse = (proc.time() -starter_lse)[3]#
+	# SSE#
+	starter_sse = proc.time()#
+	SSE <- ComputeSSE(X,y)#
+	sse_hat = SSE$alpha#
+	time_sse = (proc.time() -starter_sse)[3]#
+	# ESE#
+	starter_ese = proc.time()#
+	ESE <- ComputeESE(X,y)#
+	ese_hat = ESE$alpha#
+	time_ese = (proc.time() -starter_ese)[3]#
+	# spline#
+	starter_spline = proc.time()	#
+	spline <-Compute_spline(X,y)#
+	spline_hat = spline$alpha#
+	time_spline = (proc.time() -starter_spline)[3]#
+#
+	# MAVE#
+	starter_MAVE = proc.time()#
+	MAVE <- mave.compute(X,y,method = 'meanmave')#
+	MAVE_hat = MAVE$dir[[1]]#
+	if (MAVE_hat[1]<0)#
+	{#
+		MAVE_hat[1]=-MAVE_hat[1]#
+		MAVE_hat[2]=-MAVE_hat[2]#
+	}#
+	time_MAVE = (proc.time() -starter_MAVE)[3]#
+# EFM#
+starter_EFM = proc.time()#
+EFM <- fisher(X,y,1,mymodel="none")#
+EFM_hat <- EFM$root#
+time_EFM = (proc.time()-starter_EFM)[3]#
+#
+  write(edr_hat,file = "EDR.txt", ncol =m, append = TRUE)#
+  write(ese_hat,file = "ESE.txt", ncol =m, append = TRUE)#
+  write(sse_hat,file = "SSE.txt", ncol =m, append = TRUE)#
+  write(lse_hat,file = "LSE.txt", ncol =m, append = TRUE)#
+  write(MAVE_hat,file = "MAVE.txt", ncol =m, append = TRUE)#
+  write(EFM_hat,file = "EFM.txt", ncol =m, append = TRUE)#
+  write(spline_hat,file = "spline.txt", ncol =m, append = TRUE)#
+  normMat[j,]  = c(norm(edr_hat- a0,"2"),norm(sse_hat- a0, "2"),norm(ese_hat- a0, "2"),norm(lse_hat-a0, "2"),norm(spline_hat-a0, "2"),norm(EFM_hat-a0, "2"),norm(MAVE_hat-a0, "2"))#
+timeMat<-rbind(timeMat,c(time_edr,time_sse,time_ese,time_lse,time_spline,time_MAVE))#
+}#
+#
+colnames(timeMat) <- c("EDR","SSE","ESE","LSE","spline","MAVE")#
+pdf("BoxPlot_alpha_err.pdf")#
+boxplot(normMat,las=1)#
+boxplot(timeMat, main="Run Times", las=1) #
+dev.off()#
+#
+	A <- ESE$psi#
+	C <- ESE$data#
+#
+   x1<-A[,1]#
+    y1<-A[,2]#
+    x<-C[,1]#
+   	y<-C[,2]#
+#
+    f <- function(x) {x^3}#
+    #f <- function(x) {10*exp(x)/(1+exp(x))}#
+    x0<-seq(min(x1,x),max(x1,x),by=0.01)#
+    y0<-f(x0)#
+    plot(c(-10000,-10000),xlim=c(min(x1,x),max(x1,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x1,y1,col="blue",lwd=2,type='s')#
+    lines(x0,y0,lwd=2,col="red",lty=2)#
+    points(x,y,pch = 21)
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+n=1000#
+#
+B<-read.table("EDR.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("LSE.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("ESE.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("SSE.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("spline.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("MAVE.txt")#
+colMeans(B)#
+n*cov(B)#
+#
+B<-read.table("EFM.txt")#
+colMeans(B)#
+n*cov(B)
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+rm(list=ls())#
+source('fpigsim.R')#
+source('fisher.R')#
+library(locfit)#
+library(Rcpp)#
+library(MAVE)#
+library(EDR)#
+library(MASS)#
+sourceCpp("SSE.cpp")#
+sourceCpp("ESE.cpp")#
+sourceCpp("LSE.cpp")#
+sourceCpp("spline.cpp")#
+#
+  NumIt = 1000#
+  n = 1000#
+  m= 2#
+  sigma = 1#
+  a0 = c(1/sqrt(2),1/sqrt(2))#
+  #out=matrix(0,NumIt,m)#
+  timeMat <- NULL#
+   normMat <- matrix(0, nrow= NumIt, ncol= 7)#
+  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","EFM","MAVE")#
+for (j in 1: NumIt){#
+  sim = 1+j#
+  set.seed(sim)#
+  print(j)#
+	X = matrix(runif(m*n,0,1),n,m, byrow = FALSE)#
+	z=X%*%a0#
+	#y=(z)^3 + rnorm(n,0,sigma)#
+	y=rbinom(n,10,exp(z)/(1+exp(z)))#
+#
+	# EDR estimate proposed by Hristache et al.#
+	starter_edr = proc.time()#
+	EDR <- edr(X,y,method = "HJPS")#
+	edr_hat = -summary(EDR)$Rhat[1,] #
+	time_edr = (proc.time() -starter_edr)[3]#
+	# LSE#
+	starter_lse = proc.time()#
+	LSE <- ComputeLSE(X,y)#
+	lse_hat = LSE$alpha#
+	time_lse = (proc.time() -starter_lse)[3]#
+	# SSE#
+	starter_sse = proc.time()#
+	SSE <- ComputeSSE(X,y)#
+	sse_hat = SSE$alpha#
+	time_sse = (proc.time() -starter_sse)[3]#
+	# ESE#
+	starter_ese = proc.time()#
+	ESE <- ComputeESE(X,y)#
+	ese_hat = ESE$alpha#
+	time_ese = (proc.time() -starter_ese)[3]#
+	# spline#
+	starter_spline = proc.time()	#
+	spline <-Compute_spline(X,y)#
+	spline_hat = spline$alpha#
+	time_spline = (proc.time() -starter_spline)[3]#
+#
+	# MAVE#
+	starter_MAVE = proc.time()#
+	MAVE <- mave.compute(X,y,method = 'meanmave')#
+	MAVE_hat = MAVE$dir[[1]]#
+	if (MAVE_hat[1]<0)#
+	{#
+		MAVE_hat[1]=-MAVE_hat[1]#
+		MAVE_hat[2]=-MAVE_hat[2]#
+	}#
+	time_MAVE = (proc.time() -starter_MAVE)[3]#
+# EFM#
+starter_EFM = proc.time()#
+EFM <- fisher(X,y,1,mymodel="none")#
+EFM_hat <- EFM$root#
+time_EFM = (proc.time()-starter_EFM)[3]#
+#
+  write(edr_hat,file = "EDR.txt", ncol =m, append = TRUE)#
+  write(ese_hat,file = "ESE.txt", ncol =m, append = TRUE)#
+  write(sse_hat,file = "SSE.txt", ncol =m, append = TRUE)#
+  write(lse_hat,file = "LSE.txt", ncol =m, append = TRUE)#
+  write(MAVE_hat,file = "MAVE.txt", ncol =m, append = TRUE)#
+  write(EFM_hat,file = "EFM.txt", ncol =m, append = TRUE)#
+  write(spline_hat,file = "spline.txt", ncol =m, append = TRUE)#
+  normMat[j,]  = c(norm(edr_hat- a0,"2"),norm(sse_hat- a0, "2"),norm(ese_hat- a0, "2"),norm(lse_hat-a0, "2"),norm(spline_hat-a0, "2"),norm(EFM_hat-a0, "2"),norm(MAVE_hat-a0, "2"))#
+timeMat<-rbind(timeMat,c(time_edr,time_sse,time_ese,time_lse,time_spline,time_EFM,time_MAVE))#
+}#
+#
+colnames(timeMat) <- c("EDR","SSE","ESE","LSE","spline","EFM","MAVE")#
+pdf("BoxPlot_alpha_err.pdf")#
+boxplot(normMat,las=1)#
+boxplot(timeMat, main="Run Times", las=1) #
+dev.off()#
+#
+	A <- ESE$psi#
+	B <- ESE$derivative#
+	C <- ESE$data#
+#
+   x1<-A[,1]#
+    y1<-A[,2]#
+    x2<-B[,1]#
+    y2<-B[,2]#
+    x<-C[,1]#
+   	y<-C[,2]#
+#
+    #f <- function(x) {x^3}#
+    f <- function(x) {10*exp(x)/(1+exp(x))}#
+    x0<-seq(min(x1,x2,x),max(x1,x2,x),by=0.01)#
+    y0<-f(x0)#
+    plot(c(-10000,-10000),xlim=c(min(x2,x),max(x1,x2,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x1,y1,col="blue",lwd=2,type='s')#
+    lines(x0,y0,lwd=2,col="red",lty=2)#
+    points(x,y,pch = 21)#
+#
+#f <- function(x) {3*x^2}#
+    #f <- function(x) {10*exp(x)/(1+exp(x))}#
+    #x0<-seq(min(x2),max(x2),by=0.01)#
+    #y0<-f(x0)#
+#plot(c(-10000,-10000),xlim=c(min(x2),max(x2)), ylim=c(min(y0,y2),max(y0,y2)), main= "",ylab="",xlab="",bty="n",las=1)#
+    #lines(x2,y2,col="blue",lwd=2)#
+    #lines(x0,y0,lwd=2,col="red",lty=2)
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+rm(list=ls())#
+source('fpigsim.R')#
+source('fisher.R')#
+library(locfit)#
+library(Rcpp)#
+library(MAVE)#
+library(EDR)#
+library(MASS)#
+sourceCpp("SSE.cpp")#
+sourceCpp("ESE.cpp")#
+sourceCpp("LSE.cpp")#
+sourceCpp("spline.cpp")#
+#
+  NumIt = 1000#
+  n = 500#
+  m= 2#
+  sigma = 1#
+  a0 = c(1/sqrt(2),1/sqrt(2))#
+  #out=matrix(0,NumIt,m)#
+  timeMat <- NULL#
+   normMat <- matrix(0, nrow= NumIt, ncol= 7)#
+  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","EFM","MAVE")#
+for (j in 1: NumIt){#
+  sim = 1+j#
+  set.seed(sim)#
+  print(j)#
+	X = matrix(runif(m*n,0,1),n,m, byrow = FALSE)#
+	z=X%*%a0#
+	#y=(z)^3 + rnorm(n,0,sigma)#
+	y=rbinom(n,10,exp(z)/(1+exp(z)))#
+#
+	# EDR estimate proposed by Hristache et al.#
+	starter_edr = proc.time()#
+	EDR <- edr(X,y,method = "HJPS")#
+	edr_hat = -summary(EDR)$Rhat[1,] #
+	time_edr = (proc.time() -starter_edr)[3]#
+	# LSE#
+	starter_lse = proc.time()#
+	LSE <- ComputeLSE(X,y)#
+	lse_hat = LSE$alpha#
+	time_lse = (proc.time() -starter_lse)[3]#
+	# SSE#
+	starter_sse = proc.time()#
+	SSE <- ComputeSSE(X,y)#
+	sse_hat = SSE$alpha#
+	time_sse = (proc.time() -starter_sse)[3]#
+	# ESE#
+	starter_ese = proc.time()#
+	ESE <- ComputeESE(X,y)#
+	ese_hat = ESE$alpha#
+	time_ese = (proc.time() -starter_ese)[3]#
+	# spline#
+	starter_spline = proc.time()	#
+	spline <-Compute_spline(X,y)#
+	spline_hat = spline$alpha#
+	time_spline = (proc.time() -starter_spline)[3]#
+#
+	# MAVE#
+	starter_MAVE = proc.time()#
+	MAVE <- mave.compute(X,y,method = 'meanmave')#
+	MAVE_hat = MAVE$dir[[1]]#
+	if (MAVE_hat[1]<0)#
+	{#
+		MAVE_hat[1]=-MAVE_hat[1]#
+		MAVE_hat[2]=-MAVE_hat[2]#
+	}#
+	time_MAVE = (proc.time() -starter_MAVE)[3]#
+# EFM#
+starter_EFM = proc.time()#
+EFM <- fisher(X,y,1,mymodel="none")#
+EFM_hat <- EFM$root#
+time_EFM = (proc.time()-starter_EFM)[3]#
+#
+  write(edr_hat,file = "EDR.txt", ncol =m, append = TRUE)#
+  write(ese_hat,file = "ESE.txt", ncol =m, append = TRUE)#
+  write(sse_hat,file = "SSE.txt", ncol =m, append = TRUE)#
+  write(lse_hat,file = "LSE.txt", ncol =m, append = TRUE)#
+  write(MAVE_hat,file = "MAVE.txt", ncol =m, append = TRUE)#
+  write(EFM_hat,file = "EFM.txt", ncol =m, append = TRUE)#
+  write(spline_hat,file = "spline.txt", ncol =m, append = TRUE)#
+  normMat[j,]  = c(norm(edr_hat- a0,"2"),norm(sse_hat- a0, "2"),norm(ese_hat- a0, "2"),norm(lse_hat-a0, "2"),norm(spline_hat-a0, "2"),norm(EFM_hat-a0, "2"),norm(MAVE_hat-a0, "2"))#
+timeMat<-rbind(timeMat,c(time_edr,time_sse,time_ese,time_lse,time_spline,time_EFM,time_MAVE))#
+}#
+#
+colnames(timeMat) <- c("EDR","SSE","ESE","LSE","spline","EFM","MAVE")#
+pdf("BoxPlot_alpha_err.pdf")#
+boxplot(normMat,las=1)#
+boxplot(timeMat, main="Run Times", las=1) #
+dev.off()#
+#
+	A <- ESE$psi#
+	B <- ESE$derivative#
+	C <- ESE$data#
+#
+   x1<-A[,1]#
+    y1<-A[,2]#
+    x2<-B[,1]#
+    y2<-B[,2]#
+    x<-C[,1]#
+   	y<-C[,2]#
+#
+    #f <- function(x) {x^3}#
+    f <- function(x) {10*exp(x)/(1+exp(x))}#
+    x0<-seq(min(x1,x2,x),max(x1,x2,x),by=0.01)#
+    y0<-f(x0)#
+    plot(c(-10000,-10000),xlim=c(min(x2,x),max(x1,x2,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x1,y1,col="blue",lwd=2,type='s')#
+    lines(x0,y0,lwd=2,col="red",lty=2)#
+    points(x,y,pch = 21)#
+#
+#f <- function(x) {3*x^2}#
+    #f <- function(x) {10*exp(x)/(1+exp(x))}#
+    #x0<-seq(min(x2),max(x2),by=0.01)#
+    #y0<-f(x0)#
+#plot(c(-10000,-10000),xlim=c(min(x2),max(x2)), ylim=c(min(y0,y2),max(y0,y2)), main= "",ylab="",xlab="",bty="n",las=1)#
+    #lines(x2,y2,col="blue",lwd=2)#
+    #lines(x0,y0,lwd=2,col="red",lty=2)
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+rm(list=ls())#
+source('fpigsim.R')#
+source('fisher.R')#
+library(locfit)#
+library(Rcpp)#
+library(MAVE)#
+library(EDR)#
+library(MASS)#
+sourceCpp("SSE.cpp")#
+sourceCpp("ESE.cpp")#
+sourceCpp("LSE.cpp")#
+sourceCpp("spline.cpp")#
+#
+  NumIt = 1000#
+  n = 100#
+  m= 2#
+  sigma = 1#
+  a0 = c(1/sqrt(2),1/sqrt(2))#
+  #out=matrix(0,NumIt,m)#
+  timeMat <- NULL#
+   normMat <- matrix(0, nrow= NumIt, ncol= 7)#
+  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","EFM","MAVE")#
+for (j in 1: NumIt){#
+  sim = 1+j#
+  set.seed(sim)#
+  print(j)#
+	X = matrix(runif(m*n,0,1),n,m, byrow = FALSE)#
+	z=X%*%a0#
+	#y=(z)^3 + rnorm(n,0,sigma)#
+	y=rbinom(n,10,exp(z)/(1+exp(z)))#
+#
+	# EDR estimate proposed by Hristache et al.#
+	starter_edr = proc.time()#
+	EDR <- edr(X,y,method = "HJPS")#
+	edr_hat = -summary(EDR)$Rhat[1,] #
+	time_edr = (proc.time() -starter_edr)[3]#
+	# LSE#
+	starter_lse = proc.time()#
+	LSE <- ComputeLSE(X,y)#
+	lse_hat = LSE$alpha#
+	time_lse = (proc.time() -starter_lse)[3]#
+	# SSE#
+	starter_sse = proc.time()#
+	SSE <- ComputeSSE(X,y)#
+	sse_hat = SSE$alpha#
+	time_sse = (proc.time() -starter_sse)[3]#
+	# ESE#
+	starter_ese = proc.time()#
+	ESE <- ComputeESE(X,y)#
+	ese_hat = ESE$alpha#
+	time_ese = (proc.time() -starter_ese)[3]#
+	# spline#
+	starter_spline = proc.time()	#
+	spline <-Compute_spline(X,y)#
+	spline_hat = spline$alpha#
+	time_spline = (proc.time() -starter_spline)[3]#
+#
+	# MAVE#
+	starter_MAVE = proc.time()#
+	MAVE <- mave.compute(X,y,method = 'meanmave')#
+	MAVE_hat = MAVE$dir[[1]]#
+	if (MAVE_hat[1]<0)#
+	{#
+		MAVE_hat[1]=-MAVE_hat[1]#
+		MAVE_hat[2]=-MAVE_hat[2]#
+	}#
+	time_MAVE = (proc.time() -starter_MAVE)[3]#
+# EFM#
+starter_EFM = proc.time()#
+EFM <- fisher(X,y,1,mymodel="none")#
+EFM_hat <- EFM$root#
+time_EFM = (proc.time()-starter_EFM)[3]#
+#
+  write(edr_hat,file = "EDR.txt", ncol =m, append = TRUE)#
+  write(ese_hat,file = "ESE.txt", ncol =m, append = TRUE)#
+  write(sse_hat,file = "SSE.txt", ncol =m, append = TRUE)#
+  write(lse_hat,file = "LSE.txt", ncol =m, append = TRUE)#
+  write(MAVE_hat,file = "MAVE.txt", ncol =m, append = TRUE)#
+  write(EFM_hat,file = "EFM.txt", ncol =m, append = TRUE)#
+  write(spline_hat,file = "spline.txt", ncol =m, append = TRUE)#
+  normMat[j,]  = c(norm(edr_hat- a0,"2"),norm(sse_hat- a0, "2"),norm(ese_hat- a0, "2"),norm(lse_hat-a0, "2"),norm(spline_hat-a0, "2"),norm(EFM_hat-a0, "2"),norm(MAVE_hat-a0, "2"))#
+timeMat<-rbind(timeMat,c(time_edr,time_sse,time_ese,time_lse,time_spline,time_EFM,time_MAVE))#
+}#
+#
+colnames(timeMat) <- c("EDR","SSE","ESE","LSE","spline","EFM","MAVE")#
+pdf("BoxPlot_alpha_err.pdf")#
+boxplot(normMat,las=1)#
+boxplot(timeMat, main="Run Times", las=1) #
+dev.off()#
+#
+	A <- ESE$psi#
+	B <- ESE$derivative#
+	C <- ESE$data#
+#
+   x1<-A[,1]#
+    y1<-A[,2]#
+    x2<-B[,1]#
+    y2<-B[,2]#
+    x<-C[,1]#
+   	y<-C[,2]#
+#
+    #f <- function(x) {x^3}#
+    f <- function(x) {10*exp(x)/(1+exp(x))}#
+    x0<-seq(min(x1,x2,x),max(x1,x2,x),by=0.01)#
+    y0<-f(x0)#
+    plot(c(-10000,-10000),xlim=c(min(x2,x),max(x1,x2,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x1,y1,col="blue",lwd=2,type='s')#
+    lines(x0,y0,lwd=2,col="red",lty=2)#
+    points(x,y,pch = 21)#
+#
+#f <- function(x) {3*x^2}#
+    #f <- function(x) {10*exp(x)/(1+exp(x))}#
+    #x0<-seq(min(x2),max(x2),by=0.01)#
+    #y0<-f(x0)#
+#plot(c(-10000,-10000),xlim=c(min(x2),max(x2)), ylim=c(min(y0,y2),max(y0,y2)), main= "",ylab="",xlab="",bty="n",las=1)#
+    #lines(x2,y2,col="blue",lwd=2)#
+    #lines(x0,y0,lwd=2,col="red",lty=2)
+#########################################################
+####   MONOTONE REGRESSION        #######
+#########################################################
+rm(list=ls())#
+source('fpigsim.R')#
+source('fisher.R')#
+library(locfit)#
+library(Rcpp)#
+library(MAVE)#
+library(EDR)#
+library(MASS)#
+sourceCpp("SSE.cpp")#
+sourceCpp("ESE.cpp")#
+sourceCpp("LSE.cpp")#
+sourceCpp("spline.cpp")#
+#
+  NumIt = 1#
+  n = 100#
+  m= 2#
+  sigma = 1#
+  a0 = c(1/sqrt(2),1/sqrt(2))#
+  #out=matrix(0,NumIt,m)#
+  timeMat <- NULL#
+   normMat <- matrix(0, nrow= NumIt, ncol= 7)#
+  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","EFM","MAVE")#
+for (j in 1: NumIt){#
+  sim = 1+j#
+  set.seed(sim)#
+  print(j)#
+	X = matrix(runif(m*n,0,1),n,m, byrow = FALSE)#
+	z=X%*%a0#
+	#y=(z)^3 + rnorm(n,0,sigma)#
+	y=rbinom(n,10,exp(z)/(1+exp(z)))#
+#
+	# EDR estimate proposed by Hristache et al.#
+	starter_edr = proc.time()#
+	EDR <- edr(X,y,method = "HJPS")#
+	edr_hat = -summary(EDR)$Rhat[1,] #
+	time_edr = (proc.time() -starter_edr)[3]#
+	# LSE#
+	starter_lse = proc.time()#
+	LSE <- ComputeLSE(X,y)#
+	lse_hat = LSE$alpha#
+	time_lse = (proc.time() -starter_lse)[3]#
+	# SSE#
+	starter_sse = proc.time()#
+	SSE <- ComputeSSE(X,y)#
+	sse_hat = SSE$alpha#
+	time_sse = (proc.time() -starter_sse)[3]#
+	# ESE#
+	starter_ese = proc.time()#
+	ESE <- ComputeESE(X,y)#
+	ese_hat = ESE$alpha#
+	time_ese = (proc.time() -starter_ese)[3]#
+	# spline#
+	starter_spline = proc.time()	#
+	spline <-Compute_spline(X,y)#
+	spline_hat = spline$alpha#
+	time_spline = (proc.time() -starter_spline)[3]#
+#
+	# MAVE#
+	starter_MAVE = proc.time()#
+	MAVE <- mave.compute(X,y,method = 'meanmave')#
+	MAVE_hat = MAVE$dir[[1]]#
+	if (MAVE_hat[1]<0)#
+	{#
+		MAVE_hat[1]=-MAVE_hat[1]#
+		MAVE_hat[2]=-MAVE_hat[2]#
+	}#
+	time_MAVE = (proc.time() -starter_MAVE)[3]#
+# EFM#
+starter_EFM = proc.time()#
+EFM <- fisher(X,y,1,mymodel="none")#
+EFM_hat <- EFM$root#
+time_EFM = (proc.time()-starter_EFM)[3]#
+#
+  write(edr_hat,file = "EDR.txt", ncol =m, append = TRUE)#
+  write(ese_hat,file = "ESE.txt", ncol =m, append = TRUE)#
+  write(sse_hat,file = "SSE.txt", ncol =m, append = TRUE)#
+  write(lse_hat,file = "LSE.txt", ncol =m, append = TRUE)#
+  write(MAVE_hat,file = "MAVE.txt", ncol =m, append = TRUE)#
+  write(EFM_hat,file = "EFM.txt", ncol =m, append = TRUE)#
+  write(spline_hat,file = "spline.txt", ncol =m, append = TRUE)#
+  normMat[j,]  = c(norm(edr_hat- a0,"2"),norm(sse_hat- a0, "2"),norm(ese_hat- a0, "2"),norm(lse_hat-a0, "2"),norm(spline_hat-a0, "2"),norm(EFM_hat-a0, "2"),norm(MAVE_hat-a0, "2"))#
+timeMat<-rbind(timeMat,c(time_edr,time_sse,time_ese,time_lse,time_spline,time_EFM,time_MAVE))#
+}#
+#
+colnames(timeMat) <- c("EDR","SSE","ESE","LSE","spline","EFM","MAVE")#
+pdf("BoxPlot_alpha_err.pdf")#
+boxplot(normMat,las=1)#
+boxplot(timeMat, main="Run Times", las=1) #
+dev.off()#
+#
+	A <- ESE$psi#
+	C <- ESE$data#
+#
+   x1<-A[,1]#
+    y1<-A[,2]#
+    x<-C[,1]#
+   	y<-C[,2]#
+#
+    f <- function(x) {10*exp(x)/(1+exp(x))}#
+    x0<-seq(min(x1,x2,x),max(x1,x2,x),by=0.01)#
+    y0<-f(x0)#
+    plot(c(-10000,-10000),xlim=c(min(x2,x),max(x1,x2,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x1,y1,col="blue",lwd=2,type='s')#
+    lines(x0,y0,lwd=2,col="red",lty=2)#
+    points(x,y,pch = 21)
+f <- function(x) {10*exp(x)/(1+exp(x))}#
+    x0<-seq(min(x1,x),max(x1,x),by=0.01)#
+    y0<-f(x0)#
+    plot(c(-10000,-10000),xlim=c(min(x2,x),max(x1,x2,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
+    lines(x1,y1,col="blue",lwd=2,type='s')#
+    lines(x0,y0,lwd=2,col="red",lty=2)#
+    points(x,y,pch = 21)
+plot(c(-10000,-10000),xlim=c(min(x1,x),max(x1,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)#
     lines(x1,y1,col="blue",lwd=2,type='s')#
     lines(x0,y0,lwd=2,col="red",lty=2)#
     points(x,y,pch = 21)

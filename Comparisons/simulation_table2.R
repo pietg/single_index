@@ -105,31 +105,18 @@ boxplot(timeMat, main="Run Times", las=1)
 dev.off()
 
 	A <- ESE$psi
-	B <- ESE$derivative
 	C <- ESE$data
 
    x1<-A[,1]
     y1<-A[,2]
-    x2<-B[,1]
-    y2<-B[,2]
     x<-C[,1]
    	y<-C[,2]
 
-    #f <- function(x) {x^3}
     f <- function(x) {10*exp(x)/(1+exp(x))}
-    x0<-seq(min(x1,x2,x),max(x1,x2,x),by=0.01)
+    x0<-seq(min(x1,x),max(x1,x),by=0.01)
     y0<-f(x0)
-    plot(c(-10000,-10000),xlim=c(min(x2,x),max(x1,x2,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)
+    plot(c(-10000,-10000),xlim=c(min(x1,x),max(x1,x)), ylim=c(min(y,y0,y1),max(y,y0,y1)), main= "",ylab="",xlab="",bty="n",las=1)
     lines(x1,y1,col="blue",lwd=2,type='s')
     lines(x0,y0,lwd=2,col="red",lty=2)
     points(x,y,pch = 21)
-
-#f <- function(x) {3*x^2}
-    #f <- function(x) {10*exp(x)/(1+exp(x))}
-    #x0<-seq(min(x2),max(x2),by=0.01)
-    #y0<-f(x0)
-#plot(c(-10000,-10000),xlim=c(min(x2),max(x2)), ylim=c(min(y0,y2),max(y0,y2)), main= "",ylab="",xlab="",bty="n",las=1)
-    #lines(x2,y2,col="blue",lwd=2)
-    #lines(x0,y0,lwd=2,col="red",lty=2)
-
    
