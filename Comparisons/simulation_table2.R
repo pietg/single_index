@@ -7,7 +7,6 @@ source('fisher.R')
 library(locfit)
 library(Rcpp)
 library(MAVE)
-library(EDR)
 library(MASS)
 sourceCpp("SSE.cpp")
 sourceCpp("ESE.cpp")
@@ -22,8 +21,8 @@ sourceCpp("spline.cpp")
   
   #out=matrix(0,NumIt,m)
   timeMat <- NULL
-   normMat <- matrix(0, nrow= NumIt, ncol= 7)
-  colnames(normMat) <- c("EDR", "SSE","ESE","LSE","spline","EFM","MAVE")
+   normMat <- matrix(0, nrow= NumIt, ncol= 6)
+  colnames(normMat) <- c("SSE","ESE","LSE","spline","EFM","MAVE")
 
 
 for (j in 1: NumIt){
@@ -38,12 +37,6 @@ for (j in 1: NumIt){
 	z=X%*%a0
 	#y=(z)^3 + rnorm(n,0,sigma)
 	y=rbinom(n,10,exp(z)/(1+exp(z)))
-
-	# EDR estimate proposed by Hristache et al.
-	starter_edr = proc.time()
-	EDR <- edr(X,y,method = "HJPS")
-	edr_hat = -summary(EDR)$Rhat[1,] 
-	time_edr = (proc.time() -starter_edr)[3]
 	
 	# LSE
 	starter_lse = proc.time()
@@ -86,7 +79,6 @@ EFM <- fisher(X,y,1,mymodel="none")
 EFM_hat <- EFM$root
 time_EFM = (proc.time()-starter_EFM)[3]
 
-  write(edr_hat,file = "EDR.txt", ncol =m, append = TRUE)
   write(ese_hat,file = "ESE.txt", ncol =m, append = TRUE)
   write(sse_hat,file = "SSE.txt", ncol =m, append = TRUE)
   write(lse_hat,file = "LSE.txt", ncol =m, append = TRUE)
@@ -94,11 +86,11 @@ time_EFM = (proc.time()-starter_EFM)[3]
   write(EFM_hat,file = "EFM.txt", ncol =m, append = TRUE)
   write(spline_hat,file = "spline.txt", ncol =m, append = TRUE)
   
-  normMat[j,]  = c(norm(edr_hat- a0,"2"),norm(sse_hat- a0, "2"),norm(ese_hat- a0, "2"),norm(lse_hat-a0, "2"),norm(spline_hat-a0, "2"),norm(EFM_hat-a0, "2"),norm(MAVE_hat-a0, "2"))
-timeMat<-rbind(timeMat,c(time_edr,time_sse,time_ese,time_lse,time_spline,time_EFM,time_MAVE))
+  normMat[j,]  = c(norm(sse_hat- a0, "2"),norm(ese_hat- a0, "2"),norm(lse_hat-a0, "2"),norm(spline_hat-a0, "2"),norm(EFM_hat-a0, "2"),norm(MAVE_hat-a0, "2"))
+timeMat<-rbind(timeMat,c(time_ese,time_lse,time_spline,time_EFM,time_MAVE))
 }
 
-colnames(timeMat) <- c("EDR","SSE","ESE","LSE","spline","EFM","MAVE")
+colnames(timeMat) <- c("SSE","ESE","LSE","spline","EFM","MAVE")
 pdf("BoxPlot_alpha_err.pdf")
 boxplot(normMat,las=1)
 boxplot(timeMat, main="Run Times", las=1) 
